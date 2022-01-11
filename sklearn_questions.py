@@ -45,8 +45,8 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
-
+from scipy.linalg import norm
+from collections import Counter
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 
@@ -54,8 +54,7 @@ from sklearn.model_selection import BaseCrossValidator
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
-from sklearn.utils.multiclass import check_classification_targets
-from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.utils.multiclass import unique_labels
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +78,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
+        X, y = check_X_y(X, y)
+
+        self.X_ = X
+        self.y_ = y
+        self.classes_ = unique_labels(y)
+
         return self
 
     def predict(self, X):
@@ -94,8 +100,21 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+
+        # Check is fit had been called
+        check_is_fitted(self)
+        # Input validation
+        X = check_array(X)
+
+        y_pred = []
+
+        for x in X:
+            dist = norm(self.X_ - x, axis=1, ord=2)
+            neig = self.y_[dist.argsort()[:self.n_neighbors]]
+            y = Counter(neig).most_common()[0][0]
+            y_pred.append(y)
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +131,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        acc = (self.predict(X) == y).mean()
+        return acc
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -126,7 +146,8 @@ class MonthlySplit(BaseCrossValidator):
     ----------
     time_col : str, defaults to 'index'
         Column of the input DataFrame that will be used to split the data. This
-        column should be of type datetime. If split is called with a DataFrame
+        column should be of type datetime.
+        If split is called with a DataFrame
         for which this column is not a datetime, it will raise a ValueError.
         To use the index as column just set `time_col` to `'index'`.
     """
@@ -152,7 +173,22 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+
+        X_copy = X.copy(deep=True)
+
+        if self.time_col != "index":
+            if not X_copy[self.time_col].dtype == np.dtype('<M8[ns]'):
+                raise ValueError("datetime")
+        else:
+            X_copy = X_copy.rename_axis("date").reset_index()
+
+        X_copy["m_y"] = \
+            X_copy.date.dt.month.astype(str) + \
+            X_copy.date.dt.year.astype(str)
+
+        li = list(X_copy["m_y"].unique())
+
+        return len(li) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -175,11 +211,28 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+        X_copy = X.copy(deep=True)
+
+        if self.time_col != "index":
+            if not X_copy[self.time_col].dtype == np.dtype('<M8[ns]'):
+                raise ValueError("datetime")
+        else:
+            X_copy = X_copy.rename_axis("date").reset_index()
+
+        X_copy["index1"] = X_copy.index
+        X_copy = X_copy.sort_values(by="date")
+
+        X_copy["m_y"] = \
+            X_copy.date.dt.month.astype(str) +\
+            X_copy.date.dt.year.astype(str)
+
+        li = list(X_copy["m_y"].unique())
+
+        for i in range(len(li) - 1):
+
+            idx_train = X_copy[X_copy["m_y"] == li[i]]["index1"].values
+            idx_test = X_copy[X_copy["m_y"] == li[i + 1]]["index1"].values
+
             yield (
                 idx_train, idx_test
             )
