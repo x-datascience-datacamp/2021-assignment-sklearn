@@ -84,6 +84,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self.X_train_ = X
         self.y_train_ = y
         self.classes_ = np.unique(y)
+        # test
         return self
 
     def predict(self, X):
