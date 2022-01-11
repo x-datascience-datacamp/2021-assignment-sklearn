@@ -8,6 +8,7 @@ from numpy.testing import assert_array_equal
 
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 from sklearn.datasets import make_classification
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -37,8 +38,8 @@ def test_one_nearest_neighbor_check_estimator(k):
 
 
 @pytest.mark.parametrize("end_date_and_splits", [('2021-01-31',12), ('2020-12-31',11)])
-@pytest.mark.parametrize("shuffle", [True, False])
-def test_time_split(end_date_and_splits, shuffle):
+@pytest.mark.parametrize("shuffle_data", [True, False])
+def test_time_split(end_date_and_splits, shuffle_data):
 
     date = pd.date_range(start='2020-01-01', end=end_date_and_splits[0], freq='M')
     n_samples = len(date)
@@ -48,8 +49,8 @@ def test_time_split(end_date_and_splits, shuffle):
         index=date
     )
 
-    if shuffle:
-        X = X.sample(frac=1)
+    if shuffle_data:
+        X, y = shuffle(X, y, random_state=0)
 
     X_1d = X['val']
 
@@ -86,8 +87,8 @@ def test_time_split(end_date_and_splits, shuffle):
 
 
 @pytest.mark.parametrize("end_date", ['2021-01-31', '2020-12-31'])
-@pytest.mark.parametrize("shuffle", [True, False])
-def test_time_split_on_column(end_date, shuffle):
+@pytest.mark.parametrize("shuffle_data", [True, False])
+def test_time_split_on_column(end_date, shuffle_data):
 
     date = pd.date_range(
         start='2020-01-01 00:00', end=end_date, freq='D'
@@ -98,8 +99,8 @@ def test_time_split_on_column(end_date, shuffle):
         np.array([i % 2 for i in range(n_samples)])
     )
 
-    if shuffle:
-        X = X.sample(frac=1)
+    if shuffle_data:
+        X, y = shuffle(X, y, random_state=0)
 
     cv = MonthlySplit(time_col='date')
 
