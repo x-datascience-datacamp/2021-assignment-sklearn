@@ -115,7 +115,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         """Calculate the score of the prediction.
-        
+
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
