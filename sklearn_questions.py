@@ -173,7 +173,20 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        # if self.time_col != 'index':
+        #     col = X[self.time_col]
+        # else:
+        #     col = X.index
+        # n_splits = pd.Timedelta(col.max() - col.min()).days // 30
+        X = X.reset_index()
+        if X.dtypes[self.time_col] != 'datetime64[ns]':
+            raise ValueError('not a datetime')
+
+        X = X.set_index(self.time_col)
+        X = X.resample('M').count()
+        n_splits = len(X) - 1  # must check with responsibles!
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -195,12 +208,16 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
+        # n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        X = X.reset_index()
+        X["id"] = X.index
+
+        Xt = X.set_index(self.time_col)
+        months = Xt.resample('M').count().index.strftime("%Y-%m")
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = Xt.loc[months[i], "id"].values
+            idx_test = Xt.loc[months[i + 1], "id"].values
             yield (
                 idx_train, idx_test
             )
