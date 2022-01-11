@@ -80,10 +80,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             The current instance of the classifier
         """
         X, y = check_X_y(X, y)
-        
         # Check it's a classification problem
         check_classification_targets(y)
-        
         # Classes of data
         self.classes_ = np.unique(y)
         self.n_features_in_ = X.shape[1]
@@ -106,17 +104,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         """
         # Check is fit had been called
         check_is_fitted(self)
-        
         # Input validation
         X = check_array(X)
-        
         y_pred = []
-        
-        matrix_dist = pairwise_distances(X, self.X_) 
+        matrix_dist = pairwise_distances(X, self.X_)
         for i, dist in enumerate(matrix_dist):
             neighbors_idx = dist.argsort()[:self.n_neighbors]
-            unique_val, counts = np.unique(self.y_[neighbors_idx], return_counts=True)
-            y_pred.append(unique_val[np.argmax(counts)]) 
+            unique_val, counts = np.unique(self.y_[neighbors_idx],
+                                           return_counts=True)
+            y_pred.append(unique_val[np.argmax(counts)])
         y_pred = np.array(y_pred)
         return y_pred
 
@@ -135,7 +131,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        
         y_pred = self.predict(X)
         return np.mean(y_pred == y)
 
@@ -176,19 +171,15 @@ class MonthlySplit(BaseCrossValidator):
         -------
         n_splits : int
             The number of splits.
-        """        
+        """
         if(self.time_col != 'index'):
             X_aux = X.set_index(self.time_col)
         else:
             X_aux = X
-            
         if not pd.api.types.is_datetime64_dtype(X_aux.index):
             raise ValueError('Index column is not a datetime type')
-         
         dates = X_aux.index.strftime('%m-%y').unique().tolist()
-        
-        n_splits = len(dates)-1
-        
+        n_splits = len(dates) - 1
         return n_splits
 
     def split(self, X, y, groups=None):
@@ -211,17 +202,14 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-        
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
-        
         if(self.time_col != 'index'):
             X_aux = X.set_index(self.time_col)
         else:
             X_aux = X
         dates = X_aux.index.strftime('%m-%y').unique().tolist()
         indx = np.arange(n_samples)
-        
         for i in range(n_splits):
             mask_train = (X_aux.index.strftime('%m-%y') == dates[i])
             mask_test = (X_aux.index.strftime('%m-%y') == dates[i+1])
