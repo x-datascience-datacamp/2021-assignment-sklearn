@@ -149,6 +149,7 @@ class MonthlySplit(BaseCrossValidator):
         for which this column is not a datetime, it will raise a ValueError.
         To use the index as column just set `time_col` to `'index'`.
     """
+    
     def __init__(self, time_col='index'):  # noqa: D107
         self.time_col = time_col
 
