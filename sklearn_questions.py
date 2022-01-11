@@ -46,7 +46,6 @@ to compute distances between 2 sets of samples.
 """
 import numpy as np
 import pandas as pd
-from scipy.spatial import distance
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -59,6 +58,7 @@ from sklearn.utils.multiclass import check_classification_targets, unique_labels
 from sklearn.metrics.pairwise import pairwise_distances
 
 from collections import Counter
+
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
@@ -81,7 +81,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-        self.X_, self.y_ = check_X_y(X,y)
+        self.X_, self.y_ = check_X_y(X, y)
         check_classification_targets(y)
         self.classes_ = unique_labels(y)
         return self
@@ -108,7 +108,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             ] for distances in all_distances
         ]
         k_dist_idx_sorted = [
-            sorted(dist_with_idx, key=lambda x: x[1])[:self.n_neighbors] 
+            sorted(dist_with_idx, key=lambda x: x[1])[:self.n_neighbors]
             for dist_with_idx in all_dist_with_idx
         ]
         predicted_labels = [
@@ -137,7 +137,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             Accuracy of the model computed for the (X, y) pairs.
         """
         check_X_y(X, y)
-        return np.mean(self.predict(X)==y)
+        return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -207,7 +207,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-        #n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
             train_date = self.X_months_[i]
@@ -222,14 +221,6 @@ class MonthlySplit(BaseCrossValidator):
             )
             idx_train = np.where(train_mask)
             idx_test = np.where(test_mask)
-            #idx_train = range(n_samples)
-            #idx_test = range(n_samples)
             yield (
                 idx_train, idx_test
             )
-
-"""X = np.array([[5,6,7], [2,6,8], [17,10,2], [10, 4,9]])
-y = np.array([1,0,1,1])
-model = KNearestNeighbors(3)
-model.fit(X,y)
-print(model.predict([[3,4,8], [1,2,3]]))"""
