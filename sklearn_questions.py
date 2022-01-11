@@ -59,14 +59,13 @@ from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
 
-def next_month_date_function(date):
 
+def next_month_date_function(date):
     return (date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
-    
 
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
@@ -114,14 +113,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
         y_pred = []
 
-        distance_matrix = pairwise_distances(X, self._fit_X, metric='euclidean')
+        distance_matrix = pairwise_distances(X, self._fit_X,
+                                             metric='euclidean')
 
         for i in range(X.shape[0]):
             classes_occ = dict((i, 0) for i in self.classes_)
-            classes = self._y[np.argsort(distance_matrix[i, :])[:self.n_neighbors]]
+            nearest_points = np.argsort(distance_matrix[i, :])
+            classes = self._y[nearest_points[:self.n_neighbors]]
 
             for c in classes:
-                classes_occ[c] += 1 
+                classes_occ[c] += 1
 
             y_pred.append(max(classes_occ, key=classes_occ.get))
 
@@ -181,32 +182,41 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        
         n = 0
-        is_train = True
 
         if self.time_col == 'index':
 
             if not pd.api.types.is_datetime64_any_dtype(X.index):
-                raise ValueError('{} is not datetime compatible'.format(self.time_col))
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
 
         else:
 
             if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
-                raise ValueError('{} is not datetime compatible'.format(self.time_col)) 
-        
-        current_date = X.index[0] if self.time_col == 'index' else X[self.time_col][0]
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
+
+        if self.time_col == 'index':
+            current_date = X.index[0]
+
+        else:
+            current_date = X[self.time_col][0]
+
         next_month_date = next_month_date_function(current_date)
 
         for i in range(X.shape[0]):
 
-            date = X.index[i] if self.time_col == 'index' else X[self.time_col][i]
+            if self.time_col == 'index':
+                date = X.index[i]
+
+            else:
+                date = X[self.time_col][i]
 
             if date >= next_month_date:
 
                 n += 1
                 next_month_date = next_month_date_function(next_month_date)
-                
+
         return n
 
     def split(self, X, y, groups=None):
@@ -231,12 +241,14 @@ class MonthlySplit(BaseCrossValidator):
         if self.time_col == 'index':
 
             if not pd.api.types.is_datetime64_any_dtype(X.index):
-                raise ValueError('{} is not datetime compatible'.format(self.time_col))
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
 
         else:
 
             if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
-                raise ValueError('{} is not datetime compatible'.format(self.time_col)) 
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
 
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
@@ -244,29 +256,38 @@ class MonthlySplit(BaseCrossValidator):
         idx_all = []
         idx_aux = []
 
-        current_date = X.index[0] if self.time_col == 'index' else X[self.time_col][0]
+        if self.time_col == 'index':
+            current_date = X.index[0]
+
+        else:
+            current_date = X[self.time_col][0]
+
         next_month_date = next_month_date_function(current_date)
 
         while count < n_samples:
 
-            date = X.index[count] if self.time_col == 'index' else X[self.time_col][count]
-            
+            if self.time_col == 'index':
+                date = X.index[count]
+
+            else:
+                date = X[self.time_col][count]
+
             if date < next_month_date:
                 idx_aux.append(count)
                 count += 1
-            
+
             else:
                 idx_all.append(idx_aux)
                 idx_aux = [count]
                 count += 1
                 next_month_date = next_month_date_function(next_month_date)
-            
+
             if count == n_samples:
 
                 idx_all.append(idx_aux)
 
         for i in range(n_splits):
-            
+
             idx_train = idx_all[i]
             idx_test = idx_all[i+1]
 
