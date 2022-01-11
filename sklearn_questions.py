@@ -115,7 +115,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         """Calculate the score of the prediction.
-
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -128,7 +127,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-
         pred = self.predict(X)
         accuracy = (pred == y).sum() / pred.shape[0]
         return accuracy
@@ -155,7 +153,6 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
-
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -184,7 +181,6 @@ class MonthlySplit(BaseCrossValidator):
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
-
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -202,7 +198,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         if self.time_col == 'index':
             time = X.index
