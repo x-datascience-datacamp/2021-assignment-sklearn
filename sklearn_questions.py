@@ -62,7 +62,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 def next_month_date_function(date):
     """Get the month right next the month of the date in input.
-    
+
     Parameters
     ----------
     date : datetime
