@@ -46,6 +46,7 @@ to compute distances between 2 sets of samples.
 """
 import numpy as np
 import pandas as pd
+from scipy.stats import mode
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -56,6 +57,80 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+
+
+'''class KNearestNeighbors(BaseEstimator, ClassifierMixin):
+    """KNearestNeighbors classifier."""
+
+    def __init__(self, n_neighbors=1):  # noqa: D107
+        self.n_neighbors = n_neighbors
+
+    def fit(self, X, y):
+        """Fitting function.
+
+         Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            training data.
+        y : ndarray, shape (n_samples,)
+            target values.
+
+        Returns
+        ----------
+        self : instance of KNearestNeighbors
+            The current instance of the classifier
+        """
+        check_X_y(X, y)
+        check_classification_targets(y)
+        #self.classes_ = np.unique(y)
+        self.X_ = X
+        self.y_ = y
+        #self.n_features_in_ = X.shape[1]
+
+        return self
+
+    def predict(self, X):
+        """Predict function.
+
+        Parameters
+        ----------
+        X : ndarray, shape (n_test_samples, n_features)
+            Test data to predict on.
+
+        Returns
+        ----------
+        y : ndarray, shape (n_test_samples,)
+            Class labels for each test data sample.
+        """
+        check_is_fitted(self)
+        check_array(X)
+
+        dists_ = pairwise_distances(X, self.X_)
+        smallest_dists_ = dists_.argsort(axis=1)[:, :self.n_neighbors]
+        closest_k_neighbors = self.y_[smallest_dists_]
+        counts_classes_ = [np.bincount(el) for el in closest_k_neighbors]
+        y_pred = [el.argmax() for el in counts_classes_]
+
+        return y_pred
+
+    def score(self, X, y):
+        """Calculate the score of the prediction.
+
+        Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            training data.
+        y : ndarray, shape (n_samples,)
+            target values.
+
+        Returns
+        ----------
+        score : float
+            Accuracy of the model computed for the (X, y) pairs.
+        """
+        y_pred = self.predict(X)
+
+        return np.mean(y == y_pred)'''
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +154,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+        self.X_ = X
+        self.y_ = y
+
         return self
 
     def predict(self, X):
@@ -94,7 +178,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        check_array(X)
+
+        dists_ = pairwise_distances(X, self.X_)
+        smallest_dists_ = dists_.argsort(axis=1)[:, :self.n_neighbors]
+        closest_k_neighbors = self.y_[smallest_dists_]
+        #counts_classes_ = [np.bincount(el) for el in closest_k_neighbors]
+        #y_pred = [el.argmax() for el in counts_classes_]
+        y_pred = np.squeeze(mode(closest_k_neighbors, axis=1).mode)
+
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +205,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+
+        return np.mean(y == y_pred)
 
 
 class MonthlySplit(BaseCrossValidator):
