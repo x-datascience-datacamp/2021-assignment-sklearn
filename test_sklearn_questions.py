@@ -15,15 +15,16 @@ from sklearn_questions import KNearestNeighbors
 from sklearn_questions import MonthlySplit
 
 
-def test_one_nearest_neighbor_match_sklearn():
+@pytest.mark.parametrize("k", [1, 3, 5, 7])
+def test_one_nearest_neighbor_match_sklearn(k):
     X, y = make_classification(n_samples=200, n_features=20,
                                random_state=42)
     X_train, X_test, y_train, y_test = \
         train_test_split(X, y, random_state=42)
-    knn = KNeighborsClassifier(n_neighbors=1)
+    knn = KNeighborsClassifier(n_neighbors=k)
     y_pred_sk = knn.fit(X_train, y_train).predict(X_test)
 
-    onn = KNearestNeighbors()
+    onn = KNearestNeighbors(k)
     y_pred_me = onn.fit(X_train, y_train).predict(X_test)
     assert_array_equal(y_pred_me, y_pred_sk)
 
