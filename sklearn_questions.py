@@ -56,6 +56,7 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.neighbors import KDTree
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +80,14 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        X = check_array(X)
+        self.n_features_in_ = X.shape[1]
+        self.classes_ = np.unique(y)
+        self.TreeX_ = KDTree(X, leaf_size=2)  # in order to initialize the Tree
+        self.y_ = y
+        self.X_ = X
         return self
 
     def predict(self, X):
@@ -94,8 +103,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+
+    ################################
+    # We could use the KDTree for optimization in code execution
+    # code below:
+    # check_is_fitted(self)
+    # y_pred = np.zeros(np.array(X).shape[0])
+    # for i in range(np.array(X).shape[0]):
+    #     dist, ind = self.TreeX_.query([np.array(X)[i]], k=self.n_neighbors)
+    #     print([ind.flatten()[0]])
+    #     y_pred[i]=int(self.y_[ind.flatten()[0]])
+    # return y_pred
+    #################################
+        check_is_fitted(self)
+        X = check_array(X)
+        index = pairwise_distances(X, self.X_)
+        return self.y_[index.argmin(axis=1)]
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +135,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        data = X.shape[0]
+        score = np.sum(self.predict(X) == y)
+        return score/data
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +177,16 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        X = X.reset_index()
+        if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+            raise ValueError("datetime")
+
+        end_date = X[self.time_col].max()
+        start_date = X[self.time_col].min()
+        splits = (end_date.month-start_date.month) +\
+            (end_date.year-start_date.year)*12
+
+        return splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -175,11 +209,14 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        X = X.reset_index()
+        dates_column = X[self.time_col].dt.strftime("%Y/%m")
+        sort_dates_column = dates_column.unique()
+        sort_dates_column.sort()
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = X.loc[dates_column == sort_dates_column[i]].index
+            idx_test = X.loc[dates_column == sort_dates_column[i + 1]].index
             yield (
                 idx_train, idx_test
-            )
+                )
