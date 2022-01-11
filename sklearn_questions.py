@@ -129,7 +129,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-
         check_is_fitted(self, ["X_", "y_"])
         return (y == self.predict(X)).sum()/(len(y))
 
