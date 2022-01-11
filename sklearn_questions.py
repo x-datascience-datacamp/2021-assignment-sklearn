@@ -51,6 +51,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
+
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
 
@@ -142,6 +143,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -185,7 +187,6 @@ class MonthlySplit(BaseCrossValidator):
          idx_test : ndarray
              The testing set indices for that split.
          """
-
         n_splits = self.get_n_splits(X, y, groups)
         if self.time_col == 'index':
             month_dates = X.index.to_series().to_period('M').index
