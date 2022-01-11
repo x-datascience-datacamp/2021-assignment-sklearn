@@ -206,19 +206,19 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        # Compute the number of months between two dates
+        # Remenber the column of interest
         if self.time_col == 'index':
-            # Check if it is datetime compatible
-            if not pd.api.types.is_datetime64_any_dtype(X.index):
-                raise ValueError('{} is not datetime compatible'
-                                 .format(self.time_col))
-            return self.get_n_splits_1d(X.index)
+            X_ = X.index
         else:
-            # Check if it is datetime compatible
-            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
-                raise ValueError('{} is not datetime compatible'
-                                 .format(self.time_col))
-            return self.get_n_splits_1d(X[self.time_col])
+            X_ = X[self.time_col]
+
+        # Check if it is datetime compatible
+        if not pd.api.types.is_datetime64_any_dtype(X_):
+            raise ValueError('{} is not datetime compatible'
+                             .format(self.time_col))
+
+        # Compute the number of months between two dates
+        return self.get_n_splits_1d(X_)
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
