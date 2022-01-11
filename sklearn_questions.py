@@ -46,16 +46,22 @@ to compute distances between 2 sets of samples.
 """
 import numpy as np
 import pandas as pd
+import datetime
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 
 from sklearn.model_selection import BaseCrossValidator
+from sklearn.metrics import accuracy_score
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+
+def next_month_date_function(date):
+
+    return (date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -66,62 +72,86 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def fit(self, X, y):
         """Fitting function.
-
          Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
+        check_classification_targets(y)
+
+        X, y = check_X_y(X, y)
+
+        self._fit_X = X
+        self._y = y
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+
         return self
 
     def predict(self, X):
         """Predict function.
-
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
             Test data to predict on.
-
         Returns
         ----------
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+
+        check_is_fitted(self)
+
+        X = check_array(X)
+
+        y_pred = []
+
+        distance_matrix = pairwise_distances(X, self._fit_X, metric='euclidean')
+
+        for i in range(X.shape[0]):
+            classes_occ = dict((i, 0) for i in self.classes_)
+            classes = self._y[np.argsort(distance_matrix[i, :])[:self.n_neighbors]]
+
+            for c in classes:
+                classes_occ[c] += 1 
+
+            y_pred.append(max(classes_occ, key=classes_occ.get))
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
-
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+
+        y_pred = self.predict(X)
+
+        check_classification_targets(y)
+
+        return accuracy_score(y, y_pred)
 
 
 class MonthlySplit(BaseCrossValidator):
     """CrossValidator based on monthly split.
-
     Split data based on the given `time_col` (or default to index). Each split
     corresponds to one month of data for the training and the next month of
     data for the test.
-
     Parameters
     ----------
     time_col : str, defaults to 'index'
@@ -136,7 +166,6 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
-
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -146,17 +175,47 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Returns
         -------
         n_splits : int
             The number of splits.
         """
-        return 0
+        
+        n = 0
+        is_train = True
+
+        if self.time_col == 'index':
+
+            if not pd.api.types.is_datetime64_any_dtype(X.index):
+                raise ValueError('{} is not datetime compatible'.format(self.time_col))
+
+        else:
+
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError('{} is not datetime compatible'.format(self.time_col)) 
+        
+        current_date = X.index[0] if self.time_col == 'index' else X[self.time_col][0]
+        next_month_date = next_month_date_function(current_date)
+
+        for i in range(X.shape[0]):
+
+            date = X.index[i] if self.time_col == 'index' else X[self.time_col][i]
+
+            if date >= next_month_date:
+
+                if not is_train:
+                    n += 1
+                    next_month_date = next_month_date_function(next_month_date)
+                    is_train = True
+                
+                else:
+                    next_month_date = next_month_date_function(next_month_date)
+                    is_train = False 
+
+        return n
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
-
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -166,7 +225,6 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Yields
         ------
         idx_train : ndarray
@@ -175,11 +233,66 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
+        if self.time_col == 'index':
+
+            if not pd.api.types.is_datetime64_any_dtype(X.index):
+                raise ValueError('{} is not datetime compatible'.format(self.time_col))
+
+        else:
+
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError('{} is not datetime compatible'.format(self.time_col)) 
+
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+
+        if n_splits % 2 == 1:
+            n_splits -= 1
+        
+        filling_train = True 
+        count = 0
+        idx_train_all = []
+        idx_test_all = []
+        idx_aux = []
+        n_split = 0
+
+        current_date = X.index[0] if self.time_col == 'index' else X[self.time_col][0]
+        next_month_date = next_month_date_function(current_date)
+
+        while n_split <= n_splits:
+
+            date = X.index[count] if self.time_col == 'index' else X[self.time_col][count]
+            
+            if date < next_month_date:
+                idx_aux.append(count)
+                count += 1
+            
+            else:
+
+                if filling_train:
+                    idx_train_all.append(idx_aux)
+                    filling_train = False 
+                
+                else:
+                    idx_test_all.append(idx_aux)
+                    filling_train = True 
+                    n_split += 1
+
+                idx_aux = [count]
+                count += 1
+                next_month_date = next_month_date_function(next_month_date)
+            
+            if count == n_samples:
+
+                if filling_train:
+                    idx_train_all.append(idx_aux)
+                    filling_train = False 
+                
+                else:
+                    idx_test_all.append(idx_aux)
+                    filling_train = True 
+                
+                n_split += 1
+
+        for idx_train, idx_test in zip(idx_train_all, idx_test_all):
+            yield (idx_train, idx_test)
