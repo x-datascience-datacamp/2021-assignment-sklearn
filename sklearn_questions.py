@@ -1,4 +1,5 @@
 """Assignment - making a sklearn estimator and cv splitter.
+
 The goal of this assignment is to implement by yourself:
 - a scikit-learn estimator for the KNearestNeighbors for classification
   tasks and check that it is working properly.
@@ -35,6 +36,7 @@ Hints
 from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
+
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -54,6 +56,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def fit(self, X, y):
         """Fitting function.
+
          Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -76,6 +79,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         """Predict function.
+
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -99,6 +103,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         """Calculate the score of the prediction.
+
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -119,6 +124,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
 class MonthlySplit(BaseCrossValidator):
     """CrossValidator based on monthly split.
+
     Split data based on the given time_col (or default to index). Each split
     corresponds to one month of data for the training and the next month of
     data for the test.
@@ -130,6 +136,7 @@ class MonthlySplit(BaseCrossValidator):
         for which this column is not a datetime, it will raise a ValueError.
         To use the index as column just set time_col to 'index'.
     """
+
     def __init__(self, time_col='index'):  # noqa: D107
         self.time_col = time_col
 
@@ -161,6 +168,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
