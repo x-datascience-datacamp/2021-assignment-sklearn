@@ -37,13 +37,13 @@ def test_one_nearest_neighbor_check_estimator(k):
     check_estimator(KNearestNeighbors(n_neighbors=k))
 
 
-@pytest.mark.parametrize("end_date_and_splits",
+@pytest.mark.parametrize("end_date, expected_splits",
                          [('2021-01-31', 12), ('2020-12-31', 11)])
 @pytest.mark.parametrize("shuffle_data", [True, False])
-def test_time_split(end_date_and_splits, shuffle_data):
+def test_time_split(end_date, expected_splits, shuffle_data):
 
     date = pd.date_range(start='2020-01-01',
-                         end=end_date_and_splits[0], freq='M')
+                         end=end_date, freq='D')
     n_samples = len(date)
     X = pd.DataFrame(range(n_samples), index=date, columns=['val'])
     y = pd.DataFrame(
@@ -63,7 +63,7 @@ def test_time_split(end_date_and_splits, shuffle_data):
     assert cv_repr == repr(cv)
 
     # Test if get_n_splits works correctly
-    assert cv.get_n_splits(X, y) == end_date_and_splits[1]
+    assert cv.get_n_splits(X, y) == expected_splits
 
     # Test if the cross-validator works as expected even if
     # the data is 1d
