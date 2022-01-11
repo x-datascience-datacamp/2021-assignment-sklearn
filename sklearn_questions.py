@@ -59,27 +59,6 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import pairwise_distances_argmin
 
 
-def get_first_element(X, i):
-    """Return the first element of a specific row of an array.
-
-    Parameters
-    ----------
-    i : int
-        The index of the target row
-    X : array-like
-        The data array
-
-    Returns
-    -------
-    n_splits : int
-        The number of splits.
-    """
-    if len(X.shape) == 1:
-        return X.iloc[i]
-    else:
-        return X.iloc[i, 0]
-
-
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
@@ -206,19 +185,19 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        # Remenber the column of interest
+        # Remenber the column of interest and compute the months
         if self.time_col == 'index':
-            X_ = X.index
+            self.X_ = X.index.to_series()
         else:
-            X_ = X[self.time_col]
+            self.X_ = X[self.time_col]
 
         # Check if it is datetime compatible
-        if not pd.api.types.is_datetime64_any_dtype(X_):
+        if not pd.api.types.is_datetime64_any_dtype(self.X_):
             raise ValueError('{} is not datetime compatible'
                              .format(self.time_col))
 
         # Compute the number of months between two dates
-        return self.get_n_splits_1d(X_)
+        return self.get_n_splits_1d(self.X_)
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -242,22 +221,20 @@ class MonthlySplit(BaseCrossValidator):
         """
         # Compute the number of splits to do
         n_splits = self.get_n_splits(X, y, groups)
-        # Count number of rows in each month
-        if self.time_col == 'index':
-            X_count_month = X.resample("M").count()
-        else:
-            X_count_month = X.set_index(self.time_col).resample("M").count()
-        # Get a global counter
-        count = 0
+        # Compute months for every entry
+        self.months_ = self.X_.dt.to_period('M')
+        # Extract unique months and sort them
+        self.months_sorted_ = sorted(self.months_.unique())
         for i in range(n_splits):
             # Set the training range
-            idx_train = range(count,
-                              count + get_first_element(X_count_month, i))
-            # Increment the counter
-            count += get_first_element(X_count_month, i)
-            # Set the testing range
-            idx_test = range(count,
-                             count + get_first_element(X_count_month, i+1))
+            idx_train = np.where((self.months_.dt.year ==
+                                  self.months_sorted_[i].year)
+                                 & (self.months_.dt.month ==
+                                    self.months_sorted_[i].month))
+            idx_test = np.where((self.months_.dt.year ==
+                                 self.months_sorted_[i+1].year)
+                                & (self.months_.dt.month ==
+                                   self.months_sorted_[i+1].month))
             yield (
                 idx_train, idx_test
             )
