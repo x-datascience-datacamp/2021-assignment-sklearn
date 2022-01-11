@@ -64,12 +64,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
     def __init__(self, n_neighbors=1):  # noqa: D107
-        """
-            KNearestNeighbors
+        """KnearestNeighbors.
 
-            Parameters
-            ---------
-            n_neighbors : number of neighbors to consider
+        Parameters
+        ---------
+        n_neighbors : number of neighbors to consider
         """
         if (isinstance(n_neighbors, int) is False):
             raise ValueError("provide an integer please")
@@ -79,7 +78,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     def fit(self, X, y):
         """Fitting function.
 
-         Parameters
+        Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
             training data.
@@ -91,7 +90,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         X, y = check_X_y(X, y)
         X = check_array(X)
         y = check_array(y, ensure_2d=False, dtype=None)
@@ -119,7 +117,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-
         check_is_fitted(self)
         X = check_array(X)
 
@@ -155,7 +152,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-
         X, y = check_X_y(X, y)
         X = check_array(X)
         y = check_array(y, ensure_2d=False)
@@ -187,20 +183,19 @@ class MonthlySplit(BaseCrossValidator):
         self.time_col = time_col
 
     def _get_date_column(self, X):
-        """
-            _get_combinations :
-                Compute the month - year combinations from the date column
-            Parameters :
-            ------------
-            X : array-like of shape (n_samples, n_features)
-            Training data, where `n_samples` is the number of samples
-            and `n_features` is the number of features.
+        """_get_combinations.
 
-            Return :
-            --------
-            Pandas Series of the date column
-        """
+        Compute the month - year combinations from the date column
+        Parameters :
+        ------------
+        X : array-like of shape (n_samples, n_features)
+        Training data, where `n_samples` is the number of samples
+        and `n_features` is the number of features.
 
+        Return :
+        --------
+        Pandas Series of the date column
+        """
         if (self.time_col != 'index') and (self.time_col in X.columns):
             date_column = X[self.time_col]
         elif self.time_col == 'index':
@@ -215,21 +210,20 @@ class MonthlySplit(BaseCrossValidator):
         return date_column
 
     def _get_combinations(self, X):
+        """_get_combinations.
+
+        Compute the month - year combinations from the date column
+        Parameters :
+        ------------
+
+        X : array-like of shape (n_samples, n_features)
+        Training data, where `n_samples` is the number of samples
+        and `n_features` is the number of features.
+
+        Returns :
+        --------
+        list of tuples of year and month combinations
         """
-            _get_combinations :
-                Compute the month - year combinations from the date column
-            Parameters :
-            ------------
-
-            X : array-like of shape (n_samples, n_features)
-            Training data, where `n_samples` is the number of samples
-            and `n_features` is the number of features.
-
-            Returns :
-            --------
-            list of tuples of year and month combinations
-        """
-
         date_column = self._get_date_column(X)
 
         month_year = list(
@@ -261,7 +255,6 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-
         month_year_unique = self._get_combinations(X)
 
         n_splits = len(month_year_unique)-1
@@ -288,7 +281,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         combinations = self._get_combinations(X)
 
