@@ -132,8 +132,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         return (y_pred == y).mean()
 
     def _majority_vote(self, array):
-        """
-        Takes majority vote over
+        """Takes majority vote over second axis of this array
+
+        Parameters 
+        -----------
+        array : ndarray, shape (n_samples, k)
+
+        Returns
+        ----------
+        vote : ndarray, shape (n_samples,)
+            Majority vote over the k elements
         """
         vote = []
         for idx, x in enumerate(array):
