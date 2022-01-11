@@ -21,7 +21,7 @@ Make sure to use them to pass `test_nearest_neighbor_check_estimator`.
 
 Detailed instructions for question 2:
 The data to split should contain the index or one column in
-datatime format. Then the aim is to split the data between train and test
+datetime format. Then the aim is to split the data between train and test
 sets when for each pair of successive months, we learn on the first and
 predict of the following. For example if you have data distributed from
 november 2020 to march 2021, you have have 5 splits. The first split
@@ -43,6 +43,10 @@ Hints
 from sklearn.metrics.pairwise import pairwise_distances
 
 to compute distances between 2 sets of samples.
+
+Other function worthy of checking:
+
+from sklearn.metrics import euclidean_distance
 """
 import numpy as np
 # import pandas as pd
@@ -55,7 +59,10 @@ from sklearn.model_selection import BaseCrossValidator
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics.pairwise import pairwise_distances
+
+from scipy.stats import mode
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -63,8 +70,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
-        self.X_ = None
-        self.y_ = None
 
     def fit(self, X, y):
         """Fitting function.
@@ -81,19 +86,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-        check_array(X)
-        check_X_y(X, y)
+        X, y = check_X_y(X, y)
         check_classification_targets(y)
 
-        if self.X_ is None:
-            self.X_ = X
-            self.y_ = y
-        else:
-            if X.shape[1] != self.X.shape[1]:
-                raise ValueError("dimension mismatch")
-            else:
-                self.X_ = np.vstack([self.X_, X])
-                self.y_ = np.vstack([self.y_, y])
+        self.classes_ = unique_labels(y)
+
+        self.X_ = X
+        self.y_ = y
 
         return self
 
@@ -110,21 +109,14 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        check_array(X)
         check_is_fitted(self)
+        X = check_array(X)
 
-        y_pred = []
-        for pt in X:
-            Xa = np.vstack([X, pt])
-            dists = pairwise_distances(Xa, metric="euclidean")
-            dist_pt = dists[:-1, -1]
-            best_neighbors = np.argsort(dist_pt)[:self.n_neighbors]
-            best_classes = self.y_[best_neighbors]
-            vals, counts = np.unique(best_classes, return_counts=True)
-            index = np.argmax(counts)
-            y_pred.append(vals[index])
+        dists = pairwise_distances(self.X_, X)
+        neighbors = np.argsort(dists, axis=0)[:self.n_neighbors]
+        y_pred = self.y_[mode(neighbors, axis=0).mode]
 
-        return np.array(y_pred)
+        return y_pred.ravel()
 
     def score(self, X, y):
         """Calculate the score of the prediction.
