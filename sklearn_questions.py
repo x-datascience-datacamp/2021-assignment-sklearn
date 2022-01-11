@@ -173,7 +173,7 @@ class MonthlySplit(BaseCrossValidator):
         else:
             self.X_ = X[self.time_col]
         if not pd.api.types.is_datetime64_any_dtype(self.X_):
-            raise ValueError('The format is not compatible with the data type datetime64.')
+            raise ValueError('Not compatible with data type datetime64.')
         self.months_ = self.X_.dt.to_period('M')
         self.months_sorted_ = sorted(self.months_.unique())
         splits = len(self.months_sorted_) - 1
@@ -199,11 +199,14 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
-            idx_train = np.where((self.months_.dt.year == self.months_sorted_[i].year)
-                                 & (self.months_.dt.month == self.months_sorted_[i].month))
-            idx_test = np.where((self.months_.dt.year == self.months_sorted_[i + 1].year)
-                                & (self.months_.dt.month == self.months_sorted_[i + 1].month))
+            idx_train = np.where((self.months_.dt.year ==
+                                  self.months_sorted_[i].year)
+                                  & (self.months_.dt.month ==
+                                  self.months_sorted_[i].month))
+            idx_test = np.where((self.months_.dt.year ==
+                                 self.months_sorted_[i + 1].year)
+                                 & (self.months_.dt.month ==
+                                 self.months_sorted_[i + 1].month))
             yield (idx_train, idx_test)
