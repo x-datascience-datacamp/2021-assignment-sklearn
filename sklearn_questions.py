@@ -61,6 +61,15 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 
 def next_month_date_function(date):
+    """Get the month right next the month of the date in input.
+    
+    Parameters
+    ----------
+    date : datetime
+    Returns
+    ----------
+    datetime
+    """
     return (date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
 
@@ -72,6 +81,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def fit(self, X, y):
         """Fitting function.
+
          Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -83,7 +93,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         check_classification_targets(y)
 
         X, y = check_X_y(X, y)
@@ -97,6 +106,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         """Predict function.
+
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -106,7 +116,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-
         check_is_fitted(self)
 
         X = check_array(X)
@@ -130,6 +139,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         """Calculate the score of the prediction.
+
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -141,7 +151,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-
         y_pred = self.predict(X)
 
         check_classification_targets(y)
@@ -151,10 +160,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
 class MonthlySplit(BaseCrossValidator):
     """CrossValidator based on monthly split.
+
     Split data based on the given `time_col` (or default to index). Each split
     corresponds to one month of data for the training and the next month of
     data for the test.
-    Parameters
+     Parameters
     ----------
     time_col : str, defaults to 'index'
         Column of the input DataFrame that will be used to split the data. This
@@ -168,6 +178,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -221,6 +232,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -237,7 +249,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         if self.time_col == 'index':
 
             if not pd.api.types.is_datetime64_any_dtype(X.index):
