@@ -168,12 +168,13 @@ class MonthlySplit(BaseCrossValidator):
             The number of splits.
         """
         if self.time_col == 'index':
-            time_dt = X.index
+            time_dt = X.index.to_series()
         else:
             time_dt = X[self.time_col]
-        if time_dt.dtype != 'datetime64[ns]':
+        if (time_dt.dtype != 'datetime64[ns]'
+                and time_dt.dtype != 'datetime64'):
             raise ValueError("This column must be a datetime")
-        self.Months = time_dt.to_period('M')
+        self.Months = time_dt.dt.to_period('M')
         self.Months_ordrered = sorted(self.Months.unique())
         return len(self.Months_ordrered) - 1
 
@@ -199,13 +200,13 @@ class MonthlySplit(BaseCrossValidator):
         """
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
-            idx_train = np.where((self.Months.year ==
+            idx_train = np.where((self.Months.dt.year ==
                                   self.Months_ordrered[i].year)
-                                 & (self.Months.month ==
+                                 & (self.Months.dt.month ==
                                     self.Months_ordrered[i].month))
-            idx_test = np.where((self.Months.year ==
+            idx_test = np.where((self.Months.dt.year ==
                                  self.Months_ordrered[i+1].year)
-                                & (self.Months.month ==
+                                & (self.Months.dt.month ==
                                    self.Months_ordrered[i+1].month))
 
             yield (
