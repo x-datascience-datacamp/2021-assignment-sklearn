@@ -56,7 +56,7 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.multiclass import unique_labels
-from sklearn.metrics import pairwise_distances_argmin
+from sklearn.metrics import pairwise_distances
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -108,9 +108,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
+        # Do checks and declare intermediate variables
         check_is_fitted(self)
         X = check_array(X)
-        return self.y_[pairwise_distances_argmin(X, self.X_)]
+        y_pred = []
+        # Compute the pairwise distances
+        distances = pairwise_distances(X, self.X_)
+        # Make a prediction on each feature
+        for i in range(X.shape[0]):
+            # Compute the indexes
+            indices = np.argpartition(distances[i],
+                                      self.n_neighbors)[:self.n_neighbors]
+            # Compute the occurences
+            unique, counts = np.unique(self.y_[indices], return_counts=True)
+            # Return the most common
+            y_pred.append(unique[np.argmax(counts)])
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
