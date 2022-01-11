@@ -183,7 +183,10 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return (int((x.max() - x.min()) / np.timedelta64(1, 'M')) // 2) * 2
+        max_date = x.max()
+        min_date = x.min()
+        return ((max_date.year - min_date.year) * 12) \
+            + max_date.month - min_date.month
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
