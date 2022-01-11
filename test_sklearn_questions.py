@@ -37,7 +37,8 @@ def test_one_nearest_neighbor_check_estimator(k):
 
 
 @pytest.mark.parametrize("end_date_and_splits", [('2021-01-31',12), ('2020-12-31',11)])
-def test_time_split(end_date_and_splits):
+@pytest.mark.parametrize("shuffle", [True, False])
+def test_time_split(end_date_and_splits, shuffle):
 
     date = pd.date_range(start='2020-01-01', end=end_date_and_splits[0], freq='M')
     n_samples = len(date)
@@ -46,6 +47,10 @@ def test_time_split(end_date_and_splits):
         np.array([i % 2 for i in range(n_samples)]),
         index=date
     )
+
+    if shuffle:
+        X = X.sample(frac=1)
+
     X_1d = X['val']
 
     cv = MonthlySplit()
@@ -81,7 +86,8 @@ def test_time_split(end_date_and_splits):
 
 
 @pytest.mark.parametrize("end_date", ['2021-01-31', '2020-12-31'])
-def test_time_split_on_column(end_date):
+@pytest.mark.parametrize("shuffle", [True, False])
+def test_time_split_on_column(end_date, shuffle):
 
     date = pd.date_range(
         start='2020-01-01 00:00', end=end_date, freq='D'
@@ -92,43 +98,8 @@ def test_time_split_on_column(end_date):
         np.array([i % 2 for i in range(n_samples)])
     )
 
-    cv = MonthlySplit(time_col='date')
-
-    # Test that train, test indices returned are integers and
-    # data is correctly ordered
-    n_splits = 0
-    last_time = None
-    for train, test in cv.split(X, y):
-
-        X_train, X_test = X.iloc[train], X.iloc[test]
-        assert X_train['date'].max() < X_test['date'].min()
-        assert X_train['date'].dt.month.nunique() == 1
-        assert X_test['date'].dt.month.nunique() == 1
-        assert X_train['date'].dt.year.nunique() == 1
-        assert X_test['date'].dt.year.nunique() == 1
-        if last_time is not None:
-            assert X_test['date'].min() > last_time
-        last_time = X_test['date'].max()
-        n_splits += 1
-
-    assert 'idx' not in X.columns
-
-    assert n_splits == cv.get_n_splits(X, y)
-
-
-def test_time_split_shuffled_data():
-
-    date = pd.date_range(
-        start='2020-01-01 00:00', end='2021-01-31 23:59', freq='D'
-    )
-    n_samples = len(date)
-    X = pd.DataFrame({'val': range(n_samples), 'date': date})
-    y = pd.DataFrame(
-        np.array([i % 2 for i in range(n_samples)])
-    )
-
-    # Shuffle the data
-    X = X.sample(frac=1)
+    if shuffle:
+        X = X.sample(frac=1)
 
     cv = MonthlySplit(time_col='date')
 
