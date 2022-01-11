@@ -30,6 +30,7 @@ Finally, you need to write docstrings for the methods you code and for the
 class. The docstring will be checked using `pydocstyle` that you can also
 call at the root of the repo.
 Hints
+
 -----
 - You can use the function:
 from sklearn.metrics.pairwise import pairwise_distances
@@ -48,6 +49,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
+    
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
 
@@ -64,7 +66,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         X, y = check_X_y(X, y)
         check_classification_targets(y)
 
@@ -84,7 +85,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-
         check_is_fitted(self, ['X_train_', 'y_train_', 'classes_'])
         X = check_array(X)
 
@@ -114,7 +114,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-
         y_pred = self.predict(X)
         score = np.mean(y_pred == y)
         return score
@@ -180,6 +179,7 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
         Parameters
+        
         ----------
         X : array-like of shape (n_samples, n_features)
             Training data, where `n_samples` is the number of samples
@@ -195,7 +195,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         if self.time_col != 'index':
             X = X.set_index(self.time_col)
 
