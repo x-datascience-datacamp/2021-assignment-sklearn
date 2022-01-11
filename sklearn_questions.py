@@ -54,6 +54,7 @@ from sklearn.model_selection import BaseCrossValidator
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics.pairwise import pairwise_distances
 
 
@@ -84,6 +85,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         self.features_ = X
         self.labels_ = y
+        self.classes_ = unique_labels(y)
         return self
 
     def predict(self, X):
@@ -102,7 +104,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         # check that the model is fitted
         check_is_fitted(self)
         X = check_array(X)
-        y_pred = np.zeros(X.shape[0])
+        y_pred = []
         n_samples, n_features = X.shape
         for i in range(n_samples):
             x = X[i, :]
@@ -111,8 +113,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
                                                       n_features))).flatten()
             knn = np.argsort(distances)[:self.n_neighbors]
             nearest_labels = self.labels_[knn]
-            y_pred[i] = np.bincount(nearest_labels).argmax()
-        return y_pred
+            print(nearest_labels)
+            y_pred.append(max(list(nearest_labels),
+                              key=list(nearest_labels).count))
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
