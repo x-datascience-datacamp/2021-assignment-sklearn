@@ -203,15 +203,9 @@ class MonthlySplit(BaseCrossValidator):
 
             if date >= next_month_date:
 
-                if not is_train:
-                    n += 1
-                    next_month_date = next_month_date_function(next_month_date)
-                    is_train = True
+                n += 1
+                next_month_date = next_month_date_function(next_month_date)
                 
-                else:
-                    next_month_date = next_month_date_function(next_month_date)
-                    is_train = False 
-
         return n
 
     def split(self, X, y, groups=None):
@@ -245,21 +239,14 @@ class MonthlySplit(BaseCrossValidator):
 
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
-
-        if n_splits % 2 == 1:
-            n_splits -= 1
-        
-        filling_train = True 
         count = 0
-        idx_train_all = []
-        idx_test_all = []
+        idx_all = []
         idx_aux = []
-        n_split = 0
 
         current_date = X.index[0] if self.time_col == 'index' else X[self.time_col][0]
         next_month_date = next_month_date_function(current_date)
 
-        while n_split <= n_splits:
+        while count < n_samples:
 
             date = X.index[count] if self.time_col == 'index' else X[self.time_col][count]
             
@@ -268,31 +255,18 @@ class MonthlySplit(BaseCrossValidator):
                 count += 1
             
             else:
-
-                if filling_train:
-                    idx_train_all.append(idx_aux)
-                    filling_train = False 
-                
-                else:
-                    idx_test_all.append(idx_aux)
-                    filling_train = True 
-                    n_split += 1
-
+                idx_all.append(idx_aux)
                 idx_aux = [count]
                 count += 1
                 next_month_date = next_month_date_function(next_month_date)
             
             if count == n_samples:
 
-                if filling_train:
-                    idx_train_all.append(idx_aux)
-                    filling_train = False 
-                
-                else:
-                    idx_test_all.append(idx_aux)
-                    filling_train = True 
-                
-                n_split += 1
+                idx_all.append(idx_aux)
 
-        for idx_train, idx_test in zip(idx_train_all, idx_test_all):
+        for i in range(n_splits):
+            
+            idx_train = idx_all[i]
+            idx_test = idx_all[i+1]
+
             yield (idx_train, idx_test)
