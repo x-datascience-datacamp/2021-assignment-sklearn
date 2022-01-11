@@ -162,24 +162,6 @@ class MonthlySplit(BaseCrossValidator):
     def __init__(self, time_col='index'):  # noqa: D107
         self.time_col = time_col
 
-    def get_n_splits_1d(self, x):
-        """Return the number of splits in a 1D array.
-
-        Parameters
-        ----------
-        x : array-like of shape (n_samples, )
-            Training data, where `n_samples` is the number of samples.
-
-        Returns
-        -------
-        n_splits : int
-            The number of splits.
-        """
-        max_date = x.max()
-        min_date = x.min()
-        return ((max_date.year - min_date.year) * 12) \
-            + max_date.month - min_date.month
-
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
 
@@ -209,8 +191,13 @@ class MonthlySplit(BaseCrossValidator):
             raise ValueError('{} is not datetime compatible'
                              .format(self.time_col))
 
+        # Identify every month available
+        # NOTE: Sorting will be usefull in split
+        self.months_ = self.X_.dt.to_period('M')
+        self.months_sorted_ = sorted(self.months_.unique())
+
         # Compute the number of months between two dates
-        return self.get_n_splits_1d(self.X_)
+        return len(self.months_sorted_)-1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -234,10 +221,6 @@ class MonthlySplit(BaseCrossValidator):
         """
         # Compute the number of splits to do
         n_splits = self.get_n_splits(X, y, groups)
-        # Compute months for every entry
-        self.months_ = self.X_.dt.to_period('M')
-        # Extract unique months and sort them
-        self.months_sorted_ = sorted(self.months_.unique())
         for i in range(n_splits):
             # Set the training range
             idx_train = np.where((self.months_.dt.year ==
