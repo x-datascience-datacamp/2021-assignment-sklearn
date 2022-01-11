@@ -186,7 +186,7 @@ class MonthlySplit(BaseCrossValidator):
             The training set indices for that split.
          idx_test : ndarray
              The testing set indices for that split.
-         """
+        """
         n_splits = self.get_n_splits(X, y, groups)
         if self.time_col == 'index':
             month_dates = X.index.to_series().to_period('M').index
