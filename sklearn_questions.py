@@ -45,7 +45,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
+# import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -56,6 +56,7 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+import copy
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +80,17 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        # the target must be valid
+        check_classification_targets(y)
+        # Checks X and y for consistent length, enforces X to be 2D and y 1D
+        X, y = check_X_y(X, y)
+
+        self.X_ = X
+        self.y_ = y
+
+        self.classes_ = np.unique(self.y_)
+        self.n_features_in_ = self.X_.shape[1]
+
         return self
 
     def predict(self, X):
@@ -94,8 +106,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        # Checks if the estimator is fitted by verifying the
+        # presence of fitted attributes
+        check_is_fitted(self, ['X_', 'y_', 'classes_'])
+        # Input validation on an array
+        X = check_array(X)
+
+        distance = pairwise_distances(X, self.X_)
+        y = []
+
+        for k in range(len(X)):
+            distances = distance[k][:]
+            ind = distances.argsort()
+            neighbors = ind[:self.n_neighbors]
+            y_neighbors = self.y_[neighbors]
+            y.append(max(list(y_neighbors), key=list(y_neighbors).count))
+        return np.array(y)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +138,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_hat = self.predict(X)
+        n_samples = y_hat.shape[0]
+        right = (y_hat == y).sum()
+        return right/n_samples
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +181,17 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        Xt = X.reset_index()
+        if self.time_col == 'index':
+            time = X.index
+        else:
+            time = X[self.time_col]
+
+        if time.dtype != "datetime64[ns]":
+            raise ValueError("Type of column {self.time_col} must be datetime")
+
+        n_split = Xt[self.time_col].dt.strftime("%m/%y").nunique() - 1
+        return n_split
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +213,14 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        Xr = copy.deepcopy(X.reset_index())
+        Xr["formated_date"] = Xr[self.time_col].dt.strftime("%Y/%m")
+        date = Xr["formated_date"].unique()
+        date.sort()
+        train = Xr["formated_date"] == date[0]
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+            test = Xr["formated_date"] == date[i + 1]
+            idx_train = Xr.loc[train].index
+            idx_test = Xr.loc[test].index
+            yield (idx_train, idx_test)
