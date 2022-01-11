@@ -112,6 +112,7 @@ def test_time_split_on_column():
 
     assert n_splits == cv.get_n_splits(X, y)
 
+
 def test_time_split_even():
 
     date = pd.date_range(start='2020-01-01', end='2020-12-31', freq='M')
