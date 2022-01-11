@@ -197,7 +197,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
             idx_train = np.where((self.Months.year ==
