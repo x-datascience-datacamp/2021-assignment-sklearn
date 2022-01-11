@@ -92,6 +92,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         """Predict function.
+
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -117,6 +118,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         """Calculate the score of the prediction.
+
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -136,6 +138,7 @@ class MonthlySplit(BaseCrossValidator):
     Split data based on the given `time_col` (or default to index). Each split
     corresponds to one month of data for the training and the next month of
     data for the test.
+
     Parameters
     ----------
     time_col : str, defaults to 'index'
@@ -179,6 +182,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def split(self, X, y=None, groups=None):
         """Generate indices to split data into training and test set.
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
