@@ -45,7 +45,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
+# import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -63,6 +63,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
+        self.X_ = None
+        self.y_ = None
 
     def fit(self, X, y):
         """Fitting function.
@@ -79,6 +81,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_array(X)
+        check_X_y(X, y)
+        check_classification_targets(y)
+
+        if self.X_ is None:
+            self.X_ = X
+            self.y_ = y
+        else:
+            if X.shape[1] != self.X.shape[1]:
+                raise ValueError("dimension mismatch")
+            else:
+                self.X_ = np.vstack([self.X_, X])
+                self.y_ = np.vstack([self.y_, y])
+
         return self
 
     def predict(self, X):
@@ -94,8 +110,21 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        check_array(X)
+        check_is_fitted(self)
+
+        y_pred = []
+        for pt in X:
+            Xa = np.vstack([X, pt])
+            dists = pairwise_distances(Xa, metric="euclidean")
+            dist_pt = dists[:-1, -1]
+            best_neighbors = np.argsort(dist_pt)[:self.n_neighbors]
+            best_classes = self.y_[best_neighbors]
+            vals, counts = np.unique(best_classes, return_counts=True)
+            index = np.argmax(counts)
+            y_pred.append(vals[index])
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +141,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
