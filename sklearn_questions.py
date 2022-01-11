@@ -139,6 +139,7 @@ class MonthlySplit(BaseCrossValidator):
     corresponds to one month of data for the training and the next month of
     data for the test.
 
+
     Parameters
     ----------
     time_col : str, defaults to 'index'
