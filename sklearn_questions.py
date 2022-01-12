@@ -171,7 +171,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits_1d(self, x):
         """Return the number of splits in a 1D array.
-        
+
         Parameters
         ----------
         x : array-like of shape (n_samples, )
