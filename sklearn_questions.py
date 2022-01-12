@@ -154,7 +154,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         X, y = check_X_y(X, y)
         check_classification_targets(y)
 
@@ -280,7 +279,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
             idx_train = [i]
