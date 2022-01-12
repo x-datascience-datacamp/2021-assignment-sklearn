@@ -106,8 +106,8 @@ def test_time_split_on_column(end_date, shuffle_data, sample_perc):
         X, y = shuffle(X, y, random_state=0)
 
     if sample_perc < 1.0:
-        sample_index = X.sample(n=int(n_samples * sample_perc),
-                                replace=False).index
+        sample_index = np.random.randint(X.shape[0],
+                                         size=int(sample_perc * X.shape[0]))
         X = X.iloc[sample_index]
         y = y.iloc[sample_index]
 
