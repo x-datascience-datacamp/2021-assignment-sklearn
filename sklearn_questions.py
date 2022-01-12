@@ -56,8 +56,8 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
-
-
+from scipy.stats import mode
+from dateutil.relativedelta import relativedelta
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
@@ -79,6 +79,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.X_ = X
+        self.y_ = y
+        self.classes_ = np.unique(y)
+
         return self
 
     def predict(self, X):
@@ -94,8 +100,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        #y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+
+        dist = pairwise_distances(self.X_, X)
+        neighbors = np.argsort(dist, axis=0)[:self.n_neighbors]
+        y_pred = self.y_[mode(neighbors, axis=0).mode]
+
+        return y_pred.ravel()
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,29 +125,52 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        return np.mean(self.predict(X)==y)
 
 
 class MonthlySplit(BaseCrossValidator):
-    """CrossValidator based on monthly split.
+        """CrossValidator based on monthly split.
 
-    Split data based on the given `time_col` (or default to index). Each split
-    corresponds to one month of data for the training and the next month of
-    data for the test.
+        Split data based on the given `time_col` (or default to index). Each split
+        corresponds to one month of data for the training and the next month of
+        data for the test.
 
-    Parameters
-    ----------
-    time_col : str, defaults to 'index'
-        Column of the input DataFrame that will be used to split the data. This
-        column should be of type datetime. If split is called with a DataFrame
-        for which this column is not a datetime, it will raise a ValueError.
-        To use the index as column just set `time_col` to `'index'`.
-    """
+        Parameters
+        ----------
+        time_col : str, defaults to 'index'
+            Column of the input DataFrame that will be used to split the data. This
+            column should be of type datetime. If split is called with a DataFrame
+            for which this column is not a datetime, it will raise a ValueError.
+            To use the index as column just set `time_col` to `'index'`.
+        """
+        #if self.time_col != 'index':
+        #     col = X[self.time_col]
+        # else:
+        #     col = X.index
+        # n_splits = pd.Timedelta(col.max() - col.min()).days // 30
 
-    def __init__(self, time_col='index'):  # noqa: D107
-        self.time_col = time_col
+        def __init__(self, time_col='index'):  # noqa: D107
+            self.time_col = time_col
 
-    def get_n_splits(self, X, y=None, groups=None):
+        def get_n_splits(self, X, y=None, groups=None):
+            #X = X.reset_index()
+            #if X.dtypes[self.time_col] != 'datetime64[ns]':
+            #    raise ValueError()
+
+            #X = X.set_index(self.time_col)
+            #X = X.resample('M').count()
+            #n_splits = len(X) - 1  # must check with responsibles!
+
+            #return n_splits
+            X = X.reset_index()
+
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError("The column is not in datetime format")
+
+            date_col = X[self.time_col].dt.strftime("%Y/%m")
+            year_month_splits = date_col.unique()
+            splits = len(year_month_splits) - 1
+            return splits
         """Return the number of splitting iterations in the cross-validator.
 
         Parameters
@@ -152,34 +188,58 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
 
-    def split(self, X, y, groups=None):
-        """Generate indices to split data into training and test set.
+        def split(self, X, y, groups=None):
+            """Generate indices to split data into training and test set.
 
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data, where `n_samples` is the number of samples
-            and `n_features` is the number of features.
-        y : array-like of shape (n_samples,)
-            Always ignored, exists for compatibility.
-        groups : array-like of shape (n_samples,)
-            Always ignored, exists for compatibility.
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, n_features)
+                Training data, where `n_samples` is the number of samples
+                and `n_features` is the number of features.
+            y : array-like of shape (n_samples,)
+                Always ignored, exists for compatibility.
+            groups : array-like of shape (n_samples,)
+                Always ignored, exists for compatibility.
 
-        Yields
-        ------
-        idx_train : ndarray
-            The training set indices for that split.
-        idx_test : ndarray
-            The testing set indices for that split.
-        """
+            Yields
+            ------
+            idx_train : ndarray
+                The training set indices for that split.
+            idx_test : ndarray
+                The testing set indices for that split.
+            """
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+            n_splits = self.get_n_splits(X, y, groups)
+            #X = X.reset_index(X)
+            #X['id'] = X.index
+           # X_t = X.set_index(self.time_col)
+           # months = X_t.resample('M').count().index.strftime("%Y-%m")
+
+            #for i in range(n_splits):
+           #     idx_train = X_t.loc[months[i], "id"].values
+           #     idx_test = X_t.loc[months[i+1], "id"].values
+            
+           #     yield (
+            #        idx_train, idx_test
+            #    )
+           #         number_splits = self.get_n_splits(X, y, groups)
+            X = X.reset_index()
+            types = X.select_dtypes(include=[np.datetime64]).columns
+            if (self.time_col not in types):
+                raise ValueError("datetime")
+            X = X.set_index(self.time_col)
+
+            for i in range(n_splits):
+                train_period = X.index.min() + relativedelta(months=i)
+                test_period = X.index.min() + relativedelta(months=i + 1)
+                train_dates = X[(X.index.year == train_period.year) &
+                                (X.index.month == train_period.month)].index
+                test_dates = X[(X.index.year == test_period.year) &
+                            (X.index.month == test_period.month)].index
+                idx_train = [X.index.get_loc(date) for date in train_dates]
+                idx_test = [X.index.get_loc(date) for date in test_dates]
+                yield (
+                        idx_train, idx_test
+                    )
+                n_splits = self.get_n_splits(X, y, groups)
