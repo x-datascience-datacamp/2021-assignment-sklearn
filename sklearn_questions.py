@@ -45,7 +45,6 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -57,7 +56,6 @@ from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.stats import mode
-from dateutil.relativedelta import relativedelta
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
@@ -65,7 +63,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self.n_neighbors = n_neighbors
 
     def fit(self, X, y):
-
         """Fitting function.
 
          Parameters
@@ -101,7 +98,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-
         check_is_fitted(self)
         X = check_array(X)
 
@@ -126,7 +122,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return np.mean(self.predict(X)==y)
+        return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -144,7 +140,7 @@ class MonthlySplit(BaseCrossValidator):
             for which this column is not a datetime, it will raise a ValueError.
             To use the index as column just set `time_col` to `'index'`.
         """
-        
+
         def __init__(self, time_col='index'):  # noqa: D107
             self.time_col = time_col
 
@@ -166,7 +162,6 @@ class MonthlySplit(BaseCrossValidator):
             n_splits : int
                 The number of splits.
             """
-            
             X = X.reset_index()
             if X.dtypes[self.time_col] != 'datetime64[ns]':
                 raise ValueError('not a datetime')
@@ -202,11 +197,11 @@ class MonthlySplit(BaseCrossValidator):
             X = X.reset_index()
             X["id"] = X.index
 
-            Xt = X.set_index(self.time_col)
-            months = Xt.resample('M').count().index.strftime("%Y-%m")
+            X_t = X.set_index(self.time_col)
+            months = X_t.resample('M').count().index.strftime("%Y-%m")
             for i in range(n_splits):
-                idx_train = Xt.loc[months[i], "id"].values
-                idx_test = Xt.loc[months[i + 1], "id"].values
+                idx_train = X_t.loc[months[i], "id"].values
+                idx_test = X_t.loc[months[i + 1], "id"].values
                 yield (
                     idx_train, idx_test
                 )
