@@ -11,7 +11,7 @@ Detailed instructions for question 1:
 The nearest neighbor classifier predicts for a point X_i the target y_k of
 the training sample X_k which is the closest to X_i. We measure proximity with
 the Euclidean distance. The model will be evaluated with the accuracy (average
-number of samples corectly classified). You need to implement the `fit`,
+number of samples correctly classified). You need to implement the `fit`,
 `predict` and `score` methods for this class. The code you write should pass
 the test we implemented. You can run the tests by calling at the root of the
 repo `pytest test_sklearn_questions.py`. Note that to be fully valid, a
@@ -55,6 +55,7 @@ from sklearn.model_selection import BaseCrossValidator
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics.pairwise import pairwise_distances
 
 
@@ -79,6 +80,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.n_features_in_ = X.shape[1]
+        self.classes_ = unique_labels(y)
+
+        self.X_ = X
+        self.y_ = y
         return self
 
     def predict(self, X):
@@ -94,7 +102,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        X = check_array(X)
+        check_is_fitted(self)
+        matrix_of_distances = pairwise_distances(X, self.X_)
+        y_pred = []
+        for _, row in enumerate(matrix_of_distances):
+            idx_neighbor = np.argsort(row)[:self.n_neighbors]
+            values, counts = np.unique(self.y_[idx_neighbor],
+                                       return_counts=True)
+            y_pred.append(values[np.argmax(counts)])
+        y_pred = np.array(y_pred)
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +129,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        pred = self.predict(X)
+        score = (pred == y).sum() / pred.shape[0]
+        return score
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +171,15 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col != 'index':
+            time_ind = X[self.time_col]
+        else:
+            time_ind = X.index
+        if not any([np.dtype(time_ind) == np.dtype('datetime64[ns]'),
+                    np.dtype(time_ind) == np.dtype('datetime64')]):
+            raise ValueError('Column type must be datetime64')
+
+        return len(set([(time.year, time.month) for time in time_ind])) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +201,35 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col != 'index':
+            X = X.set_index(self.time_col)
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+        if not pd.api.types.is_datetime64_any_dtype(X.index):
+            raise ValueError('Column entry has type different from datetime64')
+        splits = []
+        date_zip = zip(X.index.month, X.index.year)
+        dates = set({(month, year) for (month, year) in date_zip})
+        for d in dates:
+            (month, year) = d
+            if month == 12:
+                if (1, 1 + year) in dates:
+                    splits.append([(month, year), (1, 1 + year)])
+            else:
+                if (1 + month, year) in dates:
+                    splits.append([(month, year), (1 + month, year)])
+        splits = np.array([[i, j, k, q] for [(i, j), (k, q)] in splits])
+        splits = splits[np.lexsort((splits[:, 1], splits[:, 0]))]
+        for split in splits:
+            first_month, first_year = split[0], split[1]
+            second_month, second_year = split[2], split[3]
+            mask_trm = (X.index.month == first_month)
+            mask_try = (X.index.year == first_year)
+            mask_ttm = (X.index.month == second_month)
+            mask_tty = (X.index.year == second_year)
+            test_mask = mask_trm & mask_try
+            train_mask = mask_ttm & mask_tty
+            idx_test = np.argwhere(test_mask).flatten()
+            idx_train = np.argwhere(train_mask).flatten()
             yield (
-                idx_train, idx_test
+                idx_test, idx_train
             )
