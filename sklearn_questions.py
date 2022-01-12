@@ -181,7 +181,7 @@ class MonthlySplit(BaseCrossValidator):
             if not X[self.time_col].dtype == 'datetime64[ns]':
                 raise ValueError('Dates are not datetime64 format')
             self.dates_ = X[self.time_col].dt
-            self.months_ = X[self.time_col].dt.to_period('M').unique() 
+            self.months_ = X[self.time_col].dt.to_period('M').unique()
         n_split = len(self.months_) - 1
 
         return n_split
