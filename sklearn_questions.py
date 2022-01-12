@@ -195,32 +195,25 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
         if self.time_col == "index":
-            if not pd.api.types.is_datetime64_any_dtype(X.index):
-                raise ValueError
+            Z = X.index
         else:
-            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
-                raise ValueError("datetime")
+            Z = X[self.time_col]
+        if not pd.api.types.is_datetime64_any_dtype(Z):
+            raise ValueError("datetime")
         if self.time_col != "index":
-            n_splits = self.get_n_splits(X, y, groups)
-            Z = X[self.time_col].dt.month
-            ls = []
-            for i in range(Z.shape[0]-1):
-                if Z[i] != Z[i+1]:
-                    ls.append(i)
-            ls = [0]+ls+[int(X.shape[0])]
-            split_idx = []
-            for i in range(len(ls)-1):
+            v = Z.dt.month.values
+            idx = [0]+list(np.where(v[:-1] != v[1:])[0])+[Z.shape[0]]
+            for i in range(len(idx)-2):
+                idx_test = np.array(list(range(idx[i+1]+1, idx[i+2])))
                 if i == 0:
-                    split_idx.append(list(range(ls[i], ls[i+1]+1)))
-                if i > 0:
-                    split_idx.append(list(range(ls[i]+1, ls[i+1]+1)))
-            split_idx[-1] = split_idx[-1][:-1]
-            for i in range(n_splits):
-                idx_train = np.array(split_idx[i])
-                idx_test = np.array(split_idx[i+1])
+                    idx_train = np.array(list(range(idx[i], idx[i+1]+1)))
+                else:
+                    idx_train = np.array(list(range(idx[i]+1, idx[i+1]+1)))
+
                 yield (
                     idx_train, idx_test
                 )
+
         if self.time_col == "index":
             n_samples = X.shape[0]
             n_splits = self.get_n_splits(X, y, groups)
