@@ -61,6 +61,7 @@ from sklearn.metrics import pairwise_distances_argmin
 
 def get_first_element(X, i):
     """Return the first element of a specific row of an array.
+
     Parameters
     ----------
     i : int
@@ -99,7 +100,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
-
         # Check the dataset
         X, y = check_X_y(X, y)
         # Set that this is a classification task
@@ -171,6 +171,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits_1d(self, x):
         """Return the number of splits in a 1D array.
+        
         Parameters
         ----------
         x : array-like of shape (n_samples, )
