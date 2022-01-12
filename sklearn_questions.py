@@ -56,6 +56,8 @@ from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.stats import mode
+
+
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
@@ -126,82 +128,80 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
 
 
 class MonthlySplit(BaseCrossValidator):
-        """CrossValidator based on monthly split.
+    """CrossValidator based on monthly split.
+    Split data based on the given `time_col` (or default to index). Each split
+    corresponds to one month of data for the training and the next month of
+    data for the test.
 
-        Split data based on the given `time_col` (or default to index). Each split
-        corresponds to one month of data for the training and the next month of
-        data for the test.
+    Parameters
+    ----------
+    time_col : str, defaults to 'index'
+    Column of the input DataFrame that will be used to split the data.
+    This column should be of type datetime. If split is called with a DataFrame
+        for which this column is not a datetime, it will raise a ValueError.
+        To use the index as column just set `time_col` to `'index'`.
+    """
+
+    def __init__(self, time_col='index'):  # noqa: D107
+        self.time_col = time_col
+
+    def get_n_splits(self, X, y=None, groups=None):
+        """Return the number of splitting iterations in the cross-validator.
 
         Parameters
         ----------
-        time_col : str, defaults to 'index'
-            Column of the input DataFrame that will be used to split the data. This
-            column should be of type datetime. If split is called with a DataFrame
-            for which this column is not a datetime, it will raise a ValueError.
-            To use the index as column just set `time_col` to `'index'`.
+        X : array-like of shape (n_samples, n_features)
+            Training data, where `n_samples` is the number of samples
+            and `n_features` is the number of features.
+        y : array-like of shape (n_samples,)
+            Always ignored, exists for compatibility.
+        groups : array-like of shape (n_samples,)
+            Always ignored, exists for compatibility.
+
+        Returns
+        -------
+        n_splits : int
+            The number of splits.
         """
+        X = X.reset_index()
+        if X.dtypes[self.time_col] != 'datetime64[ns]':
+            raise ValueError('not a datetime')
 
-        def __init__(self, time_col='index'):  # noqa: D107
-            self.time_col = time_col
+        X = X.set_index(self.time_col)
+        X = X.resample('M').count()
+        n_splits = len(X) - 1  # must check with responsibles!
 
-        def get_n_splits(self, X, y=None, groups=None):
-            """Return the number of splitting iterations in the cross-validator.
+        return n_splits
 
-            Parameters
-            ----------
-            X : array-like of shape (n_samples, n_features)
-                Training data, where `n_samples` is the number of samples
-                and `n_features` is the number of features.
-            y : array-like of shape (n_samples,)
-                Always ignored, exists for compatibility.
-            groups : array-like of shape (n_samples,)
-                Always ignored, exists for compatibility.
+    def split(self, X, y, groups=None):
+        """Generate indices to split data into training and test set.
 
-            Returns
-            -------
-            n_splits : int
-                The number of splits.
-            """
-            X = X.reset_index()
-            if X.dtypes[self.time_col] != 'datetime64[ns]':
-                raise ValueError('not a datetime')
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data, where `n_samples` is the number of samples
+            and `n_features` is the number of features.
+        y : array-like of shape (n_samples,)
+            Always ignored, exists for compatibility.
+        groups : array-like of shape (n_samples,)
+            Always ignored, exists for compatibility.
 
-            X = X.set_index(self.time_col)
-            X = X.resample('M').count()
-            n_splits = len(X) - 1  # must check with responsibles!
+        Yields
+        ------
+        idx_train : ndarray
+            The training set indices for that split.
+        idx_test : ndarray
+            The testing set indices for that split.
+        """
+        n_splits = self.get_n_splits(X, y, groups)
+        X = X.reset_index()
+        X["id"] = X.index
 
-            return n_splits
-
-
-        def split(self, X, y, groups=None):
-            """Generate indices to split data into training and test set.
-
-            Parameters
-            ----------
-            X : array-like of shape (n_samples, n_features)
-                Training data, where `n_samples` is the number of samples
-                and `n_features` is the number of features.
-            y : array-like of shape (n_samples,)
-                Always ignored, exists for compatibility.
-            groups : array-like of shape (n_samples,)
-                Always ignored, exists for compatibility.
-
-            Yields
-            ------
-            idx_train : ndarray
-                The training set indices for that split.
-            idx_test : ndarray
-                The testing set indices for that split.
-            """
-            n_splits = self.get_n_splits(X, y, groups)
-            X = X.reset_index()
-            X["id"] = X.index
-
-            X_t = X.set_index(self.time_col)
-            months = X_t.resample('M').count().index.strftime("%Y-%m")
-            for i in range(n_splits):
-                idx_train = X_t.loc[months[i], "id"].values
-                idx_test = X_t.loc[months[i + 1], "id"].values
-                yield (
-                    idx_train, idx_test
-                )
+        X_t = X.set_index(self.time_col)
+        months = X_t.resample('M').count().index.strftime("%Y-%m")
+        for i in range(n_splits):
+            idx_train = X_t.loc[months[i], "id"].values
+            idx_test = X_t.loc[months[i + 1], "id"].values
+            yield (
+                idx_train, idx_test
+            )
