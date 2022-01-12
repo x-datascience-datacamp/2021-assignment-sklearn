@@ -81,7 +81,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         """
         X, y = check_X_y(X, y)
         check_classification_targets(y)
-    
         self.X_t_, self.y_t_ = X, y
         self.classes_ = np.unique(y)
         return self
@@ -170,7 +169,7 @@ class MonthlySplit(BaseCrossValidator):
 
         if not isinstance(X[self.time_col].iloc[0], pd.Timestamp):
             raise ValueError('time_col must be a datetime column')
-        time = X[self.time_col].dt.to_period('M').nunique() - 1 
+        time = X[self.time_col].dt.to_period('M').nunique() - 1
         return time
 
     def split(self, X, y, groups=None):
@@ -206,4 +205,3 @@ class MonthlySplit(BaseCrossValidator):
             yield (
                 idx_train, idx_test
             )
-
