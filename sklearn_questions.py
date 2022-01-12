@@ -56,6 +56,8 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.utils.multiclass import unique_labels
+from scipy.stats import mode
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +81,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.classes_ = unique_labels(y)
+
+        self.X_ = X
+        self.y_ = y
+
         return self
 
     def predict(self, X):
@@ -94,7 +103,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self, ['X_', 'y_', 'classes_'])
+        X = check_array(X)
+        distances = pairwise_distances(X, self.X_)
+        n_nearest_indexes = np.argsort(distances)
+        n_nearest_indexes = n_nearest_indexes[:, :self.n_neighbors]
+        y_nearests = self.y_[n_nearest_indexes]
+
+        y_pred = mode(y_nearests, axis=1)[0].flatten()
+
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +129,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        return np.mean(y_pred == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +170,26 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col != 'index':
+            X = X.set_index(self.time_col)
+
+        if not pd.api.types.is_datetime64_any_dtype(X.index):
+            raise ValueError('Input column should be a datetime!')
+
+        n_splits = 0
+        tries = []
+        for num_date in range(len(X)):
+            tries.append((X.index.year[num_date], X.index.month[num_date]))
+        tries = set(tries)
+        for (year, month) in tries:
+            if month != 12:
+                if (year, month + 1) in tries:
+                    n_splits += 1
+            else:
+                if (year + 1, 1) in tries:
+                    n_splits += 1
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +211,30 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col != 'index':
+            X = X.set_index(self.time_col)
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+        if not pd.api.types.is_datetime64_any_dtype(X.index):
+            raise ValueError('Input column should be a datetime!')
+
+        tries = []
+        folds = []
+        for num_date in range(len(X)):
+            year, month = X.index.year[num_date], X.index.month[num_date]
+            if (year, month) not in tries:
+                tries.append((year, month))
+        for (year, month) in tries:
+            if month != 12:
+                if (year, month + 1) in tries:
+                    folds.append([(year, month), (year, month + 1)])
+            else:
+                if (year + 1, 1) in tries:
+                    folds.append([(year, month), (year + 1, 1)])
+        for [(year_i, month_i), (year_i_plus_1, month_i_plus_1)] in folds:
+            idx_train = np.argwhere((X.index.year == year_i) & (
+                X.index.month == month_i)).flatten()
+            idx_test = np.argwhere((X.index.year == year_i_plus_1) & (
+                X.index.month == month_i_plus_1)).flatten()
             yield (
                 idx_train, idx_test
             )
