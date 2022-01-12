@@ -58,6 +58,7 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
 from dateutil.relativedelta import relativedelta
 
+
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
 
@@ -88,7 +89,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             )
         if len(self.classes_) > 50:
             raise ValueError(
-                "Unknown label type: Maximum number of classes reached"
+                "Maximum of classes reached"
             )
         self.inputs_ = X
         self.labels_ = y
@@ -178,13 +179,13 @@ class MonthlySplit(BaseCrossValidator):
         if (X.index.inferred_type != "datetime64"):
             raise ValueError("datetime")
 
-        min_date = X.index.min()
-        max_date = X.index.max()
-        d = max_date.year - min_date.year
-        d *= 12
-        d += max_date.month - min_date.month
+        date_min = X.index.min()
+        date_max = X.index.max()
+        date = date_max.year - date_min.year
+        date *= 12
+        date += date_max.month - date_min.month
 
-        return d
+        return date
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -211,22 +212,20 @@ class MonthlySplit(BaseCrossValidator):
         X = X.reset_index()
         types = X.select_dtypes(include=[np.datetime64]).columns
         if (self.time_col not in types):
-            raise ValueError("datetime")
+            raise ValueError("date")
         X = X.set_index(self.time_col)
 
         for i in range(n_splits):
             idx_train = range(n_samples)
             idx_test = range(n_samples)
-            train_d = X.index.min() + relativedelta(months=i)
-            test_d = train_d + relativedelta(months=1)
-            tr_idx = X[(X.index.month == train_d.month) &
-                       (X.index.year == train_d.year)].index
-            te_idx = X[(X.index.month == test_d.month) &
-                       (X.index.year == test_d.year)].index
-            idx_train = [X.index.get_loc(d) for d in tr_idx]
-            idx_test = [X.index.get_loc(d) for d in te_idx]
+            train_date = X.index.min() + relativedelta(months=i)
+            test_date = train_date + relativedelta(months=1)
+            train_idx = X[(X.index.month == train_date.month) & (
+                X.index.year == train_date.year)].index
+            test_idx = X[(X.index.month == test_date.month) & (
+                X.index.year == test_date.year)].index
+            idx_train = [X.index.get_loc(d) for d in train_idx]
+            idx_test = [X.index.get_loc(d) for d in test_idx]
             yield (
-                idx_train, idx_test
-            )
-        
-# This is a new line that ends the file.
+                idx_train, idx_test)
+#  This is a new line that ends the file.
