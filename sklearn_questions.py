@@ -55,7 +55,27 @@ from sklearn.model_selection import BaseCrossValidator
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
-from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.utils.multiclass import unique_labels
+from sklearn.metrics import pairwise_distances_argmin
+
+
+def get_first_element(X, i):
+    """Return the first element of a specific row of an array.
+    Parameters
+    ----------
+    i : int
+        The index of the target row
+    X : array-like
+        The data array
+    Returns
+    -------
+    n_splits : int
+        The number of splits.
+    """
+    if len(X.shape) == 1:
+        return X.iloc[i]
+    else:
+        return X.iloc[i, 0]
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +99,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
+        # Check the dataset
+        X, y = check_X_y(X, y)
+        # Set that this is a classification task
+        check_classification_targets(y)
+        # Store the classes
+        self.classes_ = unique_labels(y)
+        # Store the number of features
+        self.n_features_in_ = X.shape[1]
+        # Save the dataset
+        # NOTE: This is the bruteforce way, a better thing
+        # would be to save it as a kd-tree
+        self.X_ = X
+        self.y_ = y
         return self
 
     def predict(self, X):
@@ -94,8 +128,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        check_is_fitted(self)
+        X = check_array(X)
+        return self.y_[pairwise_distances_argmin(X, self.X_)]
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +147,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        return np.sum(self.predict(X) == y) / X.shape[0]
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -134,6 +169,19 @@ class MonthlySplit(BaseCrossValidator):
     def __init__(self, time_col='index'):  # noqa: D107
         self.time_col = time_col
 
+    def get_n_splits_1d(self, x):
+        """Return the number of splits in a 1D array.
+        Parameters
+        ----------
+        x : array-like of shape (n_samples, )
+            Training data, where `n_samples` is the number of samples.
+        Returns
+        -------
+        n_splits : int
+            The number of splits.
+        """
+        return (int((x.max() - x.min()) / np.timedelta64(1, 'M')) // 2) * 2
+
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
 
@@ -152,7 +200,19 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        # Compute the number of months between two dates
+        if self.time_col == 'index':
+            # Check if it is datetime compatible
+            if not pd.api.types.is_datetime64_any_dtype(X.index):
+                raise ValueError('{} is not datetime compatible'
+                                 .format(self.time_col))
+            return self.get_n_splits_1d(X.index)
+        else:
+            # Check if it is datetime compatible
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError('{} is not datetime compatible'
+                                 .format(self.time_col))
+        return self.get_n_splits_1d(X[self.time_col])
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +234,24 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
+        # Compute the number of splits to do
         n_splits = self.get_n_splits(X, y, groups)
+        # Count number of rows in each month
+        if self.time_col == 'index':
+            X_count_month = X.resample("M").count()
+        else:
+            X_count_month = X.set_index(self.time_col).resample("M").count()
+        # Get a global counter
+        count = 0
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            # Set the training range
+            idx_train = range(count,
+                              count + get_first_element(X_count_month, i))
+            # Increment the counter
+            count += get_first_element(X_count_month, i)
+            # Set the testing range
+            idx_test = range(count,
+                             count + get_first_element(X_count_month, i+1))
             yield (
                 idx_train, idx_test
             )
