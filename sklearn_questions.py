@@ -45,7 +45,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
+from collections import Counter
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -56,6 +56,7 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.utils.multiclass import unique_labels
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +80,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        # Checks X and y for consistent length, enforces X to be 2D and y 1D
+        X, y = check_X_y(X, y)
+
+        # Ensure that target y is of a non-regression type
+        check_classification_targets(y)
+
+        # classes
+        self.classes_ = unique_labels(y)
+
+        # Keep in memory the training data to compare with input
+        # test data during prediction
+        self.X_train_ = X
+        self.y_train_ = y
+
         return self
 
     def predict(self, X):
@@ -94,7 +109,27 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        # Checks if the estimator is fitted by verifying the presence
+        # of fitted attributes (ending with a trailing underscore)
+        # and otherwise raises a NotFittedError.
+        check_is_fitted(self)
+
+        # The input is checked to be a non-empty 2D array containing
+        # only finite values
+        check_array(X)
+
+        # Distances between the train and test samples
+        distances = pairwise_distances(X, self.X_train_)
+
+        # n closest neighbors of the samples of X
+        n_clos_neigh = distances.argsort(axis=1)[:, :self.n_neighbors]
+
+        # y_pred corresponds to the most frequent class
+        # among the n nearest neighbors in X_train_
+        y_preds = self.y_train_[n_clos_neigh]
+        y_pred = [Counter(preds).most_common(1)[0][0]for preds in y_preds]
+        y_pred = np.array(y_pred).flatten()
+
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +147,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +187,19 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col == 'index':
+            time = X.index
+        else:
+            time = X[self.time_col]
+
+        if time.dtype != 'datetime64[ns]':
+            raise ValueError("time_col must be of type datetime64")
+
+        # The number of split is the number of months in the training data
+        n_splits = 12 * (time.max().year - time.min().year) \
+            + (time.max().month - time.min().month)
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +221,20 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+
+        if self.time_col == 'index':
+            month_dates = X.index.to_series().to_period('M').index
+        else:
+            month_dates = X[self.time_col].dt.to_period('M').index
+        month_years = month_dates.unique()
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            month = month_years[i]
+            if month+1 != month_years[i+1]:
+                pass
+            idx_train = np.where(month_dates == month)
+            idx_test = np.where(month_dates == month+1)
             yield (
                 idx_train, idx_test
             )
