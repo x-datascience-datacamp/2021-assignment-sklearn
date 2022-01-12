@@ -58,8 +58,6 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics import pairwise_distances_argmin
 from sklearn.utils.multiclass import unique_labels
 
-from collections import Counter
-
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
@@ -82,6 +80,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+
         # Checking inputs
         X, y = check_X_y(X, y)
         check_classification_targets(y)
@@ -107,6 +106,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
+
         # Checking...
         check_is_fitted(self)
         X = check_array(X)
@@ -128,7 +128,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        # Checking...
+
         check_is_fitted(self)
         X, y = check_X_y(X, y)
         return np.mean(self.predict(X) == y)
@@ -171,6 +171,7 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
+
         X = X.reset_index()
 
         if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
