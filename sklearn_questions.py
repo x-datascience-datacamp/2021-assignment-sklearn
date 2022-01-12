@@ -218,7 +218,7 @@ class MonthlySplit(BaseCrossValidator):
             raise ValueError('Input column should be a datetime!')
 
         tries = []
-        folds = []
+        folds = []h
         for num_date in range(len(X)):
             year, month = X.index.year[num_date], X.index.month[num_date]
             if (year, month) not in tries:
