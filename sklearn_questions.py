@@ -166,7 +166,7 @@ class MonthlySplit(BaseCrossValidator):
         """
         X = X.reset_index()
         if X.dtypes[self.time_col] != 'datetime64[ns]':
-            raise ValueError()
+            raise ValueError('not a datetime')
 
         X = X.set_index(self.time_col)
         X = X.resample('M').count()
@@ -199,7 +199,7 @@ class MonthlySplit(BaseCrossValidator):
         X["id"] = X.index
 
         X_t = X.set_index(self.time_col)
-        months = X_t.resample('M').count().index.strftime("%Y-%m")
+        months = X_t.resample('M').count().index.strftime("%Y/%m")
         for i in range(n_splits):
             idx_train = X_t.loc[months[i], "id"].values
             idx_test = X_t.loc[months[i + 1], "id"].values
