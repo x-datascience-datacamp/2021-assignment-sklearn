@@ -79,6 +79,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_classification_targets(y)
+        X, y = check_X_y(X, y)
+        self.X_ = X.copy()
+        self.y_ = y.copy()
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+        return self
         return self
 
     def predict(self, X):
@@ -94,8 +101,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        check_is_fitted(self)
+        X = check_array(X)
+        y_pred = []
+
+        distances = pairwise_distances(X, self.X_)
+        nearest_neighbors = distances.argsort(axis=1)[:, :self.n_neighbors]
+        nearest_neighbors_labels = self.y_[nearest_neighbors]
+
+        for i in range(X.shape[0]):
+            labels, count_labels = np.unique(
+                nearest_neighbors_labels[i, :],
+                return_counts=True
+            )
+            y_pred.append(labels[count_labels.argmax()])
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +133,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        X, y = check_X_y(X, y)
+        check_is_fitted(self)
+        y_pred = self.predict(X)
+        return np.mean(y_pred == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -130,7 +154,7 @@ class MonthlySplit(BaseCrossValidator):
         for which this column is not a datetime, it will raise a ValueError.
         To use the index as column just set `time_col` to `'index'`.
     """
-
+    
     def __init__(self, time_col='index'):  # noqa: D107
         self.time_col = time_col
 
@@ -152,7 +176,15 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        X = X.reset_index()
+
+        if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+            raise ValueError("The column is not in datetime format")
+
+        date_col = X[self.time_col].dt.strftime("%Y/%m")
+        year_month_splits = date_col.unique()
+        splits = len(year_month_splits) - 1
+        return splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +206,15 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        X = X.reset_index()
+        date_col = X[self.time_col].dt.strftime("%Y/%m")
+        year_month = date_col.unique()
+        year_month.sort()
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = X.loc[date_col == year_month[i]].index
+            idx_test = X.loc[date_col == year_month[i + 1]].index
             yield (
                 idx_train, idx_test
             )
