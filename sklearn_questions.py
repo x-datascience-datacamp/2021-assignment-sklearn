@@ -44,7 +44,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 to compute distances between 2 sets of samples.
 """
-from re import A
+# from re import A
 import numpy as np
 from numpy.core.fromnumeric import argmin
 # import pandas as pd
@@ -53,7 +53,7 @@ from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 
 from sklearn.model_selection import BaseCrossValidator
-from sklearn.utils import estimator_checks
+# from sklearn.utils import estimator_checks
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
@@ -171,21 +171,6 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        """if self.time_col != 'index':
-            X = X.set_index(self.time_col)
-        n_splits = 0
-        possibilities = {(month, year) for (month, year)
-                         in zip(X.index.month, X.index.year)}
-        possibilities = set(possibilities)
-        for possibility in possibilities:
-            (month, year) = possibility
-            if month == 12:
-                if (1, year + 1) in possibilities:
-                    n_splits += 1
-            else:
-                if (month + 1, year) in possibilities:
-                    n_splits += 1
-        return n_splits"""
         if self.time_col != 'index':
             X = X.set_index(self.time_col)
         if (X.index.inferred_type != "datetime64"):
@@ -217,17 +202,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        """n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        m = X.index[0].month
-        for i in range(n_splits):
-            idx_train = X.query('index.month == m')
-            idx_test = X.query('index.month == (m + 1)%12')
-            m = (m + 1) % 12
-            yield(
-                idx_train, idx_test
-            )"""
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
         X = X.reset_index()
