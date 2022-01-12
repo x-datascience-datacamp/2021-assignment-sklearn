@@ -124,15 +124,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        # add
         return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
     """CrossValidator based on monthly split.
-    Split data based on the given `time_col` (or default to index). Each split
-    corresponds to one month of data for the training and the next month of
-    data for the test.
+
+    Split data based on the given `time_col` (or default to index).
+    Each split corresponds to one month of data for the training
+    and the next month of data for the test.
 
     Parameters
     ----------
@@ -166,11 +166,11 @@ class MonthlySplit(BaseCrossValidator):
         """
         X = X.reset_index()
         if X.dtypes[self.time_col] != 'datetime64[ns]':
-            raise ValueError('not a datetime')
+            raise ValueError()
 
         X = X.set_index(self.time_col)
         X = X.resample('M').count()
-        n_splits = len(X) - 1  # must check with responsibles!
+        n_splits = len(X) - 1
 
         return n_splits
 
