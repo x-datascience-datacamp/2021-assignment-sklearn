@@ -184,8 +184,6 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         dists_ = pairwise_distances(X, self.X_)
         smallest_dists_ = dists_.argsort(axis=1)[:, :self.n_neighbors]
         closest_k_neighbors = self.y_[smallest_dists_]
-        #counts_classes_ = [np.bincount(el) for el in closest_k_neighbors]
-        #y_pred = [el.argmax() for el in counts_classes_]
         y_pred = np.squeeze(mode(closest_k_neighbors, axis=1).mode)
 
         return y_pred
@@ -247,7 +245,20 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        X_ = X.reset_index()
+        if not pd.api.types.is_datetime64_any_dtype(X_[self.time_col]):
+            raise ValueError(
+                "Column {} is not in datetime format".format(
+                    self.time_col
+                )
+            )
+        if self.time_col in X_.columns:
+            X_ = X_.set_index(self.time_col)
+        else:
+            for col in X_.columns:
+                if pd.api.types.is_datetime64_any_dtype(X_[col]):
+                    X_ = X_.set_index(col)
+        return len(X_.index.month.unique())
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -270,11 +281,10 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
 
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = [i]
+            idx_test = [i+1]
             yield (
                 idx_train, idx_test
             )
