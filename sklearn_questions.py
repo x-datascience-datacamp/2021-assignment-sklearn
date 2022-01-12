@@ -45,7 +45,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
+# import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -56,7 +56,7 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
-
+from dateutil.relativedelta import relativedelta
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
     """KNearestNeighbors classifier."""
@@ -79,6 +79,19 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_classification_targets(y)
+        X, y = check_X_y(X, y)
+        self.classes_ = np.unique(y)
+        if X.shape[0] != y.shape[0]:
+            raise ValueError(
+                "Not the same shape"
+            )
+        if len(self.classes_) > 50:
+            raise ValueError(
+                "Unknown label type: Maximum number of classes reached"
+            )
+        self.inputs_ = X
+        self.labels_ = y
         return self
 
     def predict(self, X):
@@ -94,7 +107,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+        # y_pred = np.zeros(X.shape[0])
+        distances = pairwise_distances(X, self.inputs_)
+        arg_min = np.argmin(distances, axis=1)
+        y_pred = self.labels_[arg_min]
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +130,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        X, y = check_X_y(X, y)
+        y_pred = self.predict(X)
+        score = np.mean(y_pred == y)
+        return score
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +173,18 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        X = X.reset_index()
+        X = X.set_index(self.time_col)
+        if (X.index.inferred_type != "datetime64"):
+            raise ValueError("datetime")
+
+        min_date = X.index.min()
+        max_date = X.index.max()
+        d = max_date.year - min_date.year
+        d *= 12
+        d += max_date.month - min_date.month
+
+        return d
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +206,27 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        X = X.reset_index()
+        types = X.select_dtypes(include=[np.datetime64]).columns
+        if (self.time_col not in types):
+            raise ValueError("datetime")
+        X = X.set_index(self.time_col)
+
         for i in range(n_splits):
             idx_train = range(n_samples)
             idx_test = range(n_samples)
+            train_d = X.index.min() + relativedelta(months=i)
+            test_d = train_d + relativedelta(months=1)
+            tr_idx = X[(X.index.month == train_d.month) &
+                       (X.index.year == train_d.year)].index
+            te_idx = X[(X.index.month == test_d.month) &
+                       (X.index.year == test_d.year)].index
+            idx_train = [X.index.get_loc(d) for d in tr_idx]
+            idx_test = [X.index.get_loc(d) for d in te_idx]
             yield (
                 idx_train, idx_test
             )
+        
+# This is a new line that ends the file.
