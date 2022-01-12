@@ -79,6 +79,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X = check_array(X)
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+
+        self.X_train_ = X
+        self.y_train_ = y
+        self.classes_ = np.unique(y)
         return self
 
     def predict(self, X):
@@ -94,7 +101,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        X = check_array(X)
+        check_is_fitted(self)
+        if X.shape[1] != self.X_train_.shape[1]:
+            raise ValueError('wrong nb of features')
+        distances = pairwise_distances(X, self.X_train_)
+        y_pred = np.zeros(X.shape[0], dtype=self.y_train_.dtype)
+        for i in range(len(X)):
+            nearest_neighbor_idx = np.argmin(distances[i])
+            y_pred[i] = self.y_train_[nearest_neighbor_idx]
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +127,14 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        # X = check_array(X)
+        check_is_fitted(self)
+        check_classification_targets(y)
+        X, y = check_X_y(X, y)
+
+        y_pred = self.predict(X)
+
+        return np.mean(y == y_pred)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +174,19 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if type(X) not in [pd.core.frame.DataFrame, pd.core.series.Series]:
+            raise ValueError
+        if type(X) == pd.core.series.Series:
+            X = X.to_frame()
+        if self.time_col != 'index' and self.time_col not in X.columns:
+            raise ValueError("col_name not valid")
+        col = X[self.time_col] if self.time_col != 'index' else X.index
+        if not np.issubdtype(col.dtype, np.dtype('datetime64')):
+            raise ValueError('column is not of datetime64 type')
+
+        if self.time_col == 'index':
+            return len(X.resample('M').count())-1
+        return len(X.set_index(self.time_col).resample('M').count())-1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +208,32 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if type(X) not in [pd.core.frame.DataFrame, pd.core.series.Series]:
+            raise ValueError
+        if type(X) == pd.core.series.Series:
+            X = X.to_frame()
+        if self.time_col != 'index' and self.time_col not in X.columns:
+            raise ValueError("col_name not valid")
+        col = X[self.time_col] if self.time_col != 'index' else X.index
+        if not np.issubdtype(col.dtype, np.dtype('datetime64')):
+            raise ValueError('column is not of datetime64 type')
 
-        n_samples = X.shape[0]
+        months = (X.resample('M').count().index.array
+                  if self.time_col == 'index' else
+                  X.set_index(self.time_col).resample('M').count().index.array)
+        all_months = ([(x.month, x.year) for x in X.index.array]
+                      if self.time_col == 'index' else
+                      [(x.month, x.year) for x in X[self.time_col].array])
+
+        # n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            curr_ = months[i]
+            next_ = months[i+1]
+            idx_train = [j for j, m in enumerate(all_months)
+                         if m == (curr_.month, curr_.year)]
+            idx_test = [j for j, m in enumerate(all_months)
+                        if m == (next_.month, next_.year)]
             yield (
                 idx_train, idx_test
             )
