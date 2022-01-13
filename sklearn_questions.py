@@ -79,6 +79,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_classification_targets(y)
+        self.X_, y = check_X_y(check_array(X), y)
+        self.classes_, self.y_ = np.unique(y, return_inverse=True)
         return self
 
     def predict(self, X):
@@ -94,7 +97,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+        distances = pairwise_distances(self.X_, X)
+        y_pred = self.classes_[self.y_[np.argmin(distances, axis=0)]]
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +118,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        check_classification_targets(y)
+        X, y = check_X_y(check_array(X), y)
+        return np.mean(self.predict(X) == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +160,10 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        t_index = getattr(X, self.time_col)
+        if not pd.api.types.is_datetime64_any_dtype(t_index):
+            raise ValueError('Time column is not datetime64 !')
+        return len(set([(t.month, t.year) for t in t_index])) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +185,21 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        t_index = getattr(X, self.time_col)
+        if not pd.api.types.is_datetime64_any_dtype(t_index):
+            raise ValueError('Time column is not datetime64 !')
+        t_index = pd.DatetimeIndex(data=t_index)
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
-        for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+        dates = set([(t.month, t.year) for t in t_index])
+        splits = np.array([[m, y, m + 1, y] for m, y in dates
+                           if (m < 12 and (1, y + 1) in dates)] +
+                          [[m, y, 1, y + 1] for m, y in dates
+                           if (m == 12 and (1, y + 1) in dates)])
+        splits = splits[np.lexsort((splits[:, 1], splits[:, 0]))]
+
+        for split in splits:
+            idx_train = np.argwhere((t_index.month == split[0]) &
+                                    (t_index.year == split[1])).flatten()
+            idx_test = np.argwhere((t_index.month == split[2]) &
+                                   (t_index.year == split[3])).flatten()
+            yield idx_train, idx_test
