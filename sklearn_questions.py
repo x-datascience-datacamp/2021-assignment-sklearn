@@ -46,16 +46,31 @@ to compute distances between 2 sets of samples.
 """
 import numpy as np
 import pandas as pd
+import datetime
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
 
 from sklearn.model_selection import BaseCrossValidator
+from sklearn.metrics import accuracy_score
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+
+
+def next_month_date_function(date):
+    """Get the month right next the month of the date in input.
+
+    Parameters
+    ----------
+    date : datetime
+    Returns
+    ----------
+    datetime
+    """
+    return (date.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -73,12 +88,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_classification_targets(y)
+
+        X, y = check_X_y(X, y)
+
+        self._fit_X = X
+        self._y = y
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+
         return self
 
     def predict(self, X):
@@ -88,14 +111,31 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         ----------
         X : ndarray, shape (n_test_samples, n_features)
             Test data to predict on.
-
         Returns
         ----------
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        check_is_fitted(self)
+
+        X = check_array(X)
+
+        y_pred = []
+
+        distance_matrix = pairwise_distances(X, self._fit_X,
+                                             metric='euclidean')
+
+        for i in range(X.shape[0]):
+            classes_occ = dict((i, 0) for i in self.classes_)
+            nearest_points = np.argsort(distance_matrix[i, :])
+            classes = self._y[nearest_points[:self.n_neighbors]]
+
+            for c in classes:
+                classes_occ[c] += 1
+
+            y_pred.append(max(classes_occ, key=classes_occ.get))
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -106,13 +146,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+
+        check_classification_targets(y)
+
+        return accuracy_score(y, y_pred)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -121,8 +164,7 @@ class MonthlySplit(BaseCrossValidator):
     Split data based on the given `time_col` (or default to index). Each split
     corresponds to one month of data for the training and the next month of
     data for the test.
-
-    Parameters
+     Parameters
     ----------
     time_col : str, defaults to 'index'
         Column of the input DataFrame that will be used to split the data. This
@@ -146,13 +188,47 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Returns
         -------
         n_splits : int
             The number of splits.
         """
-        return 0
+        n = 0
+
+        if self.time_col == 'index':
+
+            if not pd.api.types.is_datetime64_any_dtype(X.index):
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
+
+        else:
+
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
+
+        if self.time_col == 'index':
+            current_date = X.index[0]
+
+        else:
+            current_date = X[self.time_col][0]
+
+        next_month_date = next_month_date_function(current_date)
+
+        for i in range(X.shape[0]):
+
+            if self.time_col == 'index':
+                date = X.index[i]
+
+            else:
+                date = X[self.time_col][i]
+
+            if date >= next_month_date:
+
+                n += 1
+                next_month_date = next_month_date_function(next_month_date)
+
+        return n
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -166,7 +242,6 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Yields
         ------
         idx_train : ndarray
@@ -174,12 +249,57 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col == 'index':
+
+            if not pd.api.types.is_datetime64_any_dtype(X.index):
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
+
+        else:
+
+            if not pd.api.types.is_datetime64_any_dtype(X[self.time_col]):
+                raise ValueError('{} is not datetime compatible'.format(
+                                 self.time_col))
 
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        count = 0
+        idx_all = []
+        idx_aux = []
+
+        if self.time_col == 'index':
+            current_date = X.index[0]
+
+        else:
+            current_date = X[self.time_col][0]
+
+        next_month_date = next_month_date_function(current_date)
+
+        while count < n_samples:
+
+            if self.time_col == 'index':
+                date = X.index[count]
+
+            else:
+                date = X[self.time_col][count]
+
+            if date < next_month_date:
+                idx_aux.append(count)
+                count += 1
+
+            else:
+                idx_all.append(idx_aux)
+                idx_aux = [count]
+                count += 1
+                next_month_date = next_month_date_function(next_month_date)
+
+            if count == n_samples:
+
+                idx_all.append(idx_aux)
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+
+            idx_train = idx_all[i]
+            idx_test = idx_all[i+1]
+
+            yield (idx_train, idx_test)
