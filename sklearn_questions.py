@@ -1,12 +1,10 @@
 """Assignment - making a sklearn estimator and cv splitter.
 
 The goal of this assignment is to implement by yourself:
-
 - a scikit-learn estimator for the KNearestNeighbors for classification
   tasks and check that it is working properly.
 - a scikit-learn CV splitter where the splits are based on a Pandas
   DateTimeIndex.
-
 Detailed instructions for question 1:
 The nearest neighbor classifier predicts for a point X_i the target y_k of
 the training sample X_k which is the closest to X_i. We measure proximity with
@@ -18,7 +16,6 @@ repo `pytest test_sklearn_questions.py`. Note that to be fully valid, a
 scikit-learn estimator needs to check that the input given to `fit` and
 `predict` are correct using the `check_*` functions imported in the file.
 Make sure to use them to pass `test_nearest_neighbor_check_estimator`.
-
 Detailed instructions for question 2:
 The data to split should contain the index or one column in
 datatime format. Then the aim is to split the data between train and test
@@ -27,21 +24,16 @@ predict of the following. For example if you have data distributed from
 november 2020 to march 2021, you have have 4 splits. The first split
 will allow to learn on november data and predict on december data, the
 second split to learn december and predict on january etc.
-
 We also ask you to respect the pep8 convention: https://pep8.org. This will be
 enforced with `flake8`. You can check that there is no flake8 errors by
 calling `flake8` at the root of the repo.
-
 Finally, you need to write docstrings for the methods you code and for the
 class. The docstring will be checked using `pydocstyle` that you can also
 call at the root of the repo.
-
 Hints
 -----
 - You can use the function:
-
 from sklearn.metrics.pairwise import pairwise_distances
-
 to compute distances between 2 sets of samples.
 """
 import numpy as np
@@ -56,6 +48,8 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+
+import datetime
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -73,12 +67,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        self.training_data_, self.train_label_ = check_X_y(X, y)
+        check_classification_targets(self.train_label_)
+        self.classes_ = np.unique(self.train_label_)
+        self.effective_metric_ = "euclidean"
+        self.effective_metric_params_ = {}
+        self.n_features_in_ = self.training_data_.shape[1]
+        self.feature_names_in_ = None
+        self.n_samples_fit_ = self.training_data_.shape[0]
+        self.outputs_2d_ = False
+        self.is_fitted_ = True
+
         return self
 
     def predict(self, X):
@@ -88,13 +92,34 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         ----------
         X : ndarray, shape (n_test_samples, n_features)
             Test data to predict on.
-
         Returns
         ----------
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
+        check_is_fitted(self)
+        X = check_array(X)
         y_pred = np.zeros(X.shape[0])
+        y_pred = y_pred.astype(self.train_label_.dtype)
+
+        les_distances = pairwise_distances(X,
+                                           self.training_data_,
+                                           metric='euclidean')
+
+        # Selection des n_neighbors plus proches voisins dans ensemble train
+        n_nearest_samples = \
+            np.argsort(les_distances, axis=1)[:, :self.n_neighbors]
+        potential_targets = self.train_label_[n_nearest_samples]
+
+        # Selection de la prédiction par vote majoritaire
+        predict_target = []
+        for cible in potential_targets:
+            une_cible, counts = np.unique(cible, return_counts=True)
+            predict_target.append(une_cible[np.argmax(counts)])
+
+        y_pred = np.array(predict_target)
+        check_classification_targets(y_pred)
+
         return y_pred
 
     def score(self, X, y):
@@ -106,13 +131,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
             training data.
         y : ndarray, shape (n_samples,)
             target values.
-
         Returns
         ----------
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        check_classification_targets(y)
+        y_pred = self.predict(X)
+        df = pd.DataFrame([y, y_pred]).T
+        condition = df[0] == df[1]
+        df_ok = df[condition]
+
+        accuracy = df_ok.shape[0] / df.shape[0]
+
+        return accuracy
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -146,13 +178,29 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Returns
         -------
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col == "index":
+            index = X.index
+        else:
+            index = X[self.time_col]
+
+        if not any([np.dtype(index) == np.dtype("datetime64"),
+                    np.dtype(index) == np.dtype("datetime64[ns]")]):
+            Msg_Erreur = "ERROR: Type of column {} should be datetime" \
+                .format(self.time_col)
+            raise ValueError(Msg_Erreur)
+
+        liste_mois = []
+        for the_time in index:
+            liste_mois.append((the_time.year, the_time.month))
+
+        n_splits = len(set(liste_mois)) - 1
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -166,7 +214,6 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
-
         Yields
         ------
         idx_train : ndarray
@@ -174,12 +221,46 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col == "index":
+            index = X.index
+        else:
+            index = X[self.time_col]
 
         n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
+        n_splits = self.get_n_splits(X)
+
+        liste_mois = []
+        for the_time in index:
+            liste_mois.append((the_time.year, the_time.month))
+        les_mois = sorted(set(liste_mois))
+
+        deb_split = []
+        fin_split = []
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            debut = datetime.datetime(year=les_mois[i][0],
+                                      month=les_mois[i][1],
+                                      day=1)
+            deb_split.append(debut.strftime("%Y-%m-%d %H:%M"))
+            fin = datetime.datetime(year=les_mois[i+1][0],
+                                    month=les_mois[i+1][1],
+                                    day=1) - \
+                datetime.timedelta(minutes=1)
+            fin_split.append(fin.strftime("%Y-%m-%d %H:%M"))
+        # derniere plage temporelle
+        debut = datetime.datetime(year=les_mois[n_splits][0],
+                                  month=les_mois[n_splits][1],
+                                  day=1)
+        deb_split.append(debut.strftime("%Y-%m-%d %H:%M"))
+        fin_split.append(index[n_samples-1].strftime("%Y-%m-%d %H:%M"))
+
+        for i in range(n_splits):
+            train_date_range = pd.date_range(start=deb_split[i],
+                                             end=fin_split[i])
+            test_date_range = pd.date_range(start=deb_split[i+1],
+                                            end=fin_split[i+1])
+            idx_train = np.where(index.isin(train_date_range) == 1)
+            idx_test = np.where(index.isin(test_date_range) == 1)
+
             yield (
                 idx_train, idx_test
             )
