@@ -56,6 +56,8 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from collections import Counter
+from sklearn.utils.multiclass import unique_labels
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,6 +81,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        self.classes_ = unique_labels(y)
+        X, y = check_X_y(X, y)
+        self.labels_ = y
+        self.data_ = X
         return self
 
     def predict(self, X):
@@ -94,9 +100,24 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        
+        # Check is fit had been called
+        check_is_fitted(self)
+        #Input validation
+        X = check_array(X)
+        neighbor = self.n_neighbors
 
+        y_pred = [0 for  i in range(X.shape[0])]
+        dist = pairwise_distances(X, self.data_)
+        closest_neighbors = np.argsort(dist, axis=1)[:, :neighbor]
+        labels = self.labels_[closest_neighbors]
+        for i in range(len(labels)):
+            y_pred[i] = Counter(labels[i]).most_common()[0][0]
+        
+        
+        return np.array(y_pred)
+    
+    
     def score(self, X, y):
         """Calculate the score of the prediction.
 
@@ -112,7 +133,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        score = 0
+        for x in range(len(y)):
+            if y_pred[x] == y[x] : 
+                score += 1
+        score = score / len(y)
+        return score
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,8 +179,18 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        n_splits = X.reset_index()
+        if self.time_col == 'index':
+            time = X.index
+        else:
+            time = X[self.time_col]
 
+        if (time.dtype != "datetime64[ns]"):
+            raise ValueError("not datetime")
+
+        n_splits = n_splits.resample["M"].count()
+        return n_splits.shape[0] - 1
+    
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
 
