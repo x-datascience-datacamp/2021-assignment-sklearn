@@ -44,8 +44,8 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 to compute distances between 2 sets of samples.
 """
+from tokenize import group
 import numpy as np
-import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -162,7 +162,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
-
+        
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -178,21 +178,14 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
+        X = X.reset_index()
+        X = X.set_index(self.time_col)
 
-        if self.time_col != 'index':
+        if X.index.inferred_type != 'datetime64':
 
-            idx = X[self.time_col]
+            raise ValueError('Column must be datetime64 type')
 
-        else:
-
-            idx = X.index
-
-        if not any([np.dtype(idx) == np.dtype('datetime64[ns]'),
-                    np.dtype(idx) == np.dtype('datetime64')]):
-
-            raise ValueError
-
-        return len(np.unique(X.index.strftime('%m-%y')).tolist()) - 1
+        return len(np.unique([i.strftime("%m-%y") for i in X.index])) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -215,19 +208,20 @@ class MonthlySplit(BaseCrossValidator):
             The testing set indices for that split.
         """
         D = X.copy()
-        D = D.reset_index().set_index(self.time_col)
+        D = D.reset_index()
+        D = D.set_index(self.time_col)
 
         n_samples = D.shape[0]
-        n_splits = self.get_n_splits(D, y, groups)
+        n_splits = self.get_n_splits(D, y, group)
 
         idxs = np.arange(n_samples)
 
-        dates = np.unique(D.index.strftime('%m-%y')).tolist()
+        dates = D.index.strftime("%m-%y").unique().tolist()
 
         for i in range(n_splits):
 
-            train_mask = (D.index.strftime('%m-%y') == dates[i])
-            test_mask = (D.index.strftime('%m-%y') == dates[i + 1])
+            train_mask = D.index.strftime("%m-%y") == dates[i]
+            test_mask = D.index.strftime("%m-%y") == dates[i + 1]
 
             train_idx = idxs[train_mask]
             test_idx = idxs[test_mask]
