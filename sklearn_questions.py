@@ -24,8 +24,8 @@ The data to split should contain the index or one column in
 datatime format. Then the aim is to split the data between train and test
 sets when for each pair of successive months, we learn on the first and
 predict of the following. For example if you have data distributed from
-november 2020 to March 2021, you have 5 splits. The first split
-will allow learning on november data and predict on december data, the
+november 2020 to march 2021, you have have 4 splits. The first split
+will allow to learn on november data and predict on december data, the
 second split to learn december and predict on january etc.
 
 We also ask you to respect the pep8 convention: https://pep8.org. This will be
