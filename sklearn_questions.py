@@ -45,7 +45,6 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -54,7 +53,6 @@ from sklearn.model_selection import BaseCrossValidator
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
-from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
 from collections import Counter
 from sklearn.utils.multiclass import unique_labels
@@ -88,8 +86,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         return self
 
     def predict(self, X):
-        """Predict function.
-
+        """Predict function."""
+        """
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -100,24 +98,21 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        
+
         # Check is fit had been called
         check_is_fitted(self)
-        #Input validation
+        # Input validation
         X = check_array(X)
         neighbor = self.n_neighbors
 
-        y_pred = [0 for  i in range(X.shape[0])]
+        y_pred = [0 for i in range(X.shape[0])]
         dist = pairwise_distances(X, self.data_)
         closest_neighbors = np.argsort(dist, axis=1)[:, :neighbor]
         labels = self.labels_[closest_neighbors]
         for i in range(len(labels)):
             y_pred[i] = Counter(labels[i]).most_common()[0][0]
-        
-        
         return np.array(y_pred)
-    
-    
+
     def score(self, X, y):
         """Calculate the score of the prediction.
 
@@ -136,7 +131,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y_pred = self.predict(X)
         score = 0
         for x in range(len(y)):
-            if y_pred[x] == y[x] : 
+            if y_pred[x] == y[x]:
                 score += 1
         score = score / len(y)
         return score
@@ -187,7 +182,7 @@ class MonthlySplit(BaseCrossValidator):
 
         n_splits = n_splits.resample("M").count()
         return n_splits.shape[0] - 1
-    
+
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
 
