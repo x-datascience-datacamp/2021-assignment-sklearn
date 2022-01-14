@@ -180,15 +180,12 @@ class MonthlySplit(BaseCrossValidator):
             The number of splits.
         """
         n_splits = X.reset_index()
-        if self.time_col == 'index':
-            time = X.index
-        else:
-            time = X[self.time_col]
+        n_splits = n_splits.set_index(self.time_col)
 
-        if (time.dtype != "datetime64[ns]"):
+        if (n_splits.index.inferred_type != "datetime64"):
             raise ValueError("not datetime")
 
-        n_splits = n_splits.resample["M"].count()
+        n_splits = n_splits.resample("M").count()
         return n_splits.shape[0] - 1
     
     def split(self, X, y, groups=None):
@@ -199,7 +196,7 @@ class MonthlySplit(BaseCrossValidator):
         X : array-like of shape (n_samples, n_features)
             Training data, where `n_samples` is the number of samples
             and `n_features` is the number of features.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,)s
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
@@ -211,12 +208,16 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
+        X = X.reset_index()
+        X = X.set_index(self.time_col)
         n_splits = self.get_n_splits(X, y, groups)
+        month = X.index.to_period('M')
+        print(month)
+        list_month = month.unique()
+        print(list_month)
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = np.where((month == list_month[i]))
+            idx_test = np.where((month == list_month[i+1]))
             yield (
                 idx_train, idx_test
             )
