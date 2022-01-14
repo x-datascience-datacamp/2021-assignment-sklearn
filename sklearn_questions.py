@@ -174,7 +174,7 @@ class MonthlySplit(BaseCrossValidator):
         else:
             all_dates = X[self.time_col]
         if not pd.api.types.is_datetime64_any_dtype(all_dates):
-            raise ValueError('Invalid format')
+            raise ValueError('Invalid format, need datetime64.')
         self.all_dates_ = all_dates.dt.to_period('M')
         self.X_months_ = sorted(self.all_dates_.unique())
         return len(self.X_months_) - 1
@@ -200,7 +200,6 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_splits = self.get_n_splits(X, y, groups)
         for i in range(n_splits):
             train_date = self.X_months_[i]
