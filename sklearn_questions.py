@@ -45,7 +45,6 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -54,8 +53,9 @@ from sklearn.model_selection import BaseCrossValidator
 
 from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
-from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from collections import Counter
+from sklearn.utils.multiclass import unique_labels
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -79,11 +79,15 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        self.classes_ = unique_labels(y)
+        X, y = check_X_y(X, y)
+        self.labels_ = y
+        self.data_ = X
         return self
 
     def predict(self, X):
-        """Predict function.
-
+        """Predict function."""
+        """
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
@@ -94,8 +98,20 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+
+        # Check is fit had been called
+        check_is_fitted(self)
+        # Input validation
+        X = check_array(X)
+        neighbor = self.n_neighbors
+
+        y_pred = [0 for i in range(X.shape[0])]
+        dist = pairwise_distances(X, self.data_)
+        closest_neighbors = np.argsort(dist, axis=1)[:, :neighbor]
+        labels = self.labels_[closest_neighbors]
+        for i in range(len(labels)):
+            y_pred[i] = Counter(labels[i]).most_common()[0][0]
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +128,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        score = 0
+        for x in range(len(y)):
+            if y_pred[x] == y[x]:
+                score += 1
+        score = score / len(y)
+        return score
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +174,14 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        n_splits = X.reset_index()
+        n_splits = n_splits.set_index(self.time_col)
+
+        if (n_splits.index.inferred_type != "datetime64"):
+            raise ValueError("not datetime")
+
+        n_splits = n_splits.resample("M").count()
+        return n_splits.shape[0] - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -162,7 +191,7 @@ class MonthlySplit(BaseCrossValidator):
         X : array-like of shape (n_samples, n_features)
             Training data, where `n_samples` is the number of samples
             and `n_features` is the number of features.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,)s
             Always ignored, exists for compatibility.
         groups : array-like of shape (n_samples,)
             Always ignored, exists for compatibility.
@@ -174,12 +203,16 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
+        X = X.reset_index()
+        X = X.set_index(self.time_col)
         n_splits = self.get_n_splits(X, y, groups)
+        month = X.index.to_period('M')
+        print(month)
+        list_month = month.unique()
+        print(list_month)
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = np.where((month == list_month[i]))
+            idx_test = np.where((month == list_month[i+1]))
             yield (
                 idx_train, idx_test
             )
