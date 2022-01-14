@@ -102,9 +102,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         """
         check_is_fitted(self)
         X = check_array(X)
-        dist = pairwise_distances(self.X_train_, X, metric = 'euclidean')
+        dist = pairwise_distances(self.X_train_, X, metric='euclidean')
         indx = np.argsort(dist, axis=0)[:self.n_neighbors]
-        y_pred = mode(self.y_train_[indx], axis = 0)[0]
+        y_pred = mode(self.y_train_[indx], axis=0)[0]
 
         return y_pred[0]
 
