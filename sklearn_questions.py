@@ -45,7 +45,8 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
+# import pandas as pd
+from collections import Counter
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -79,6 +80,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.data_ = X
+        self.labels_ = y
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X):
@@ -94,8 +101,22 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        def get_class(closest_indexes):
+            labels = np.array([self.labels_[i] for i in closest_indexes])
+            counts = Counter(labels)
+            return max(counts, key=counts.get)
+        check_is_fitted(self)
+        X = check_array(X)
+        y_pred = []
+        n = len(X)
+        all_distances = pairwise_distances(X, self.data_)
+        for i in range(n):
+            # prediction of the current sample
+            distances_to_i = all_distances[i]
+            closest_indexes = np.argsort(distances_to_i)[:self.n_neighbors]
+            pred_i = get_class(closest_indexes)
+            y_pred.append(pred_i)
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -112,7 +133,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        y_preds = self.predict(X)
+        score = np.mean(y_preds == y)
+        return score
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -152,7 +177,25 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        from pandas.api.types import is_datetime64_any_dtype as is_datetime
+
+        if self.time_col == "index":
+            X = X.reset_index()
+
+        n_splits = 0
+        n_samples = X.shape[0]
+        if not is_datetime(X[self.time_col]):
+            raise ValueError("datetime")
+
+        month_last = X[self.time_col][0].month
+        for i in range(1, n_samples):
+            month_current = X[self.time_col][i].month
+            if (month_current == month_last + 1) or \
+               (month_last == 12 and month_current == 1):
+                n_splits += 1
+            # update for next iteration
+            month_last = month_current
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -174,12 +217,38 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
         n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        if self.time_col == "index":
+            X = X.reset_index()
+
+        month_last = X[self.time_col][0].month
+        cut_indexes = []
+        for i in range(1, n_samples):
+            month_current = X[self.time_col][i].month
+            if (month_current == month_last + 1) or \
+               (month_last == 12 and month_current == 1):
+                cut_indexes.append(i)
+            # update for next iteration
+            month_last = month_current
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+
+            cut_train_test = cut_indexes[i]
+
+            # first split
+            if i == 0:
+                start_train = 0
+            else:
+                start_train = cut_indexes[i-1]
+            # last split
+            if i == n_splits - 1:
+                stop_test = n_samples
+            else:
+                stop_test = cut_indexes[i+1]
+
+            idx_train = range(start_train, cut_train_test)
+            idx_test = range(cut_train_test, stop_test)
             yield (
                 idx_train, idx_test
             )
