@@ -79,6 +79,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.classes_ = np.unique(y)
+        self.X_ = X
+        self.y_ = y
         return self
 
     def predict(self, X):
@@ -94,7 +99,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+        matrix = pairwise_distances(self.X_, X, metric='euclidean')
+        y_pred = self.y_[np.argmin(matrix, axis=0)]
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +120,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        return np.mean(y_pred == y)
 
 
 class MonthlySplit(BaseCrossValidator):
