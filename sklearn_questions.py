@@ -45,7 +45,6 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
-import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -59,7 +58,9 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
-    """KNearestNeighbors classifier."""
+    """KNearestNeighbors classifier.
+    Get K nearest Neighbors
+    """
 
     def __init__(self, n_neighbors=1):  # noqa: D107
         self.n_neighbors = n_neighbors
@@ -79,6 +80,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.classes_ = np.unique(y)
+        self.X_ = X
+        self.y_ = y
         return self
 
     def predict(self, X):
@@ -94,7 +100,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+        symmetric_matrix = pairwise_distances(X, self.X_)
+        index_min = np.argmin(symmetric_matrix, axis=1)
+        y_pred = self.y_[index_min]
         return y_pred
 
     def score(self, X, y):
@@ -112,7 +122,11 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        check_is_fitted(self)
+        check_classification_targets(y)
+        X, y = check_X_y(X, y)
+        y_pred = self.predict(X)
+        return np.mean(y_pred == y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -148,7 +162,8 @@ class MonthlySplit(BaseCrossValidator):
             Always ignored, exists for compatibility.
 
         Returns
-        -------
+        ------
+
         n_splits : int
             The number of splits.
         """
@@ -183,3 +198,5 @@ class MonthlySplit(BaseCrossValidator):
             yield (
                 idx_train, idx_test
             )
+
+        return idx_train, idx_test
