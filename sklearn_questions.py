@@ -45,6 +45,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 to compute distances between 2 sets of samples.
 """
 import numpy as np
+import pandas as pd
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -102,7 +103,8 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         check_is_fitted(self)
         X = check_array(X)
         pw_distances = pairwise_distances(X, self.X_)
-        y_pred = self.y_[pw_distances.argmin(axis=1)]
+        idx_pred = pw_distances.argmin(axis=1)
+        y_pred = self.y_[idx_pred]
         return y_pred
 
     def score(self, X, y):
@@ -168,10 +170,13 @@ class MonthlySplit(BaseCrossValidator):
         else:
             time_datetime = X[self.time_col]
         if time_datetime.dtype != 'datetime64[ns]':
-            raise ValueError("This time column is not datetime")
-        self.months = time_datetime.to_period('M')
-        self.months_ordrered = sorted(self.months.unique())
-        return len(self.months_ordrered) - 1
+            raise ValueError("This time column is not datetime64 data type")
+        start = min(time_datetime)
+        end = max(time_datetime)
+
+        n_splits = (end.year - start.year) * 12 + (end.month - start.month)
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -196,15 +201,21 @@ class MonthlySplit(BaseCrossValidator):
 
         X = X.reset_index()
         X = X.set_index(self.time_col)
+        X_time = X[self.time_col]
         n_splits = self.get_n_splits(X, y, groups)
+        start = min(X.index)
 
         for i in range(n_splits):
-            idx_train = np.where(
-                (self.months.year == self.months_ordrered[i].year)
-                & (self.months.month == self.months_ordrered[i].month))
-            idx_test = np.where(
-                (self.months.year == self.months_ordrered[i+1].year)
-                & (self.months.month == self.months_ordrered[i+1].month))
+            month_train = (start.month + i) % 12 + 1
+            month_test = (start.month + i + 1) % 12 + 1
+            year_train = start.year + (start.month + i) // 12
+            year_test = start.year + (start.month + i + 1) // 12
+            idx_train = pd.Series(X_time)[
+                (X_time.month == month_train) & (X_time.year == year_train)
+            ].index.values
+            idx_test = pd.Series(X_time)[
+                (X_time.month == month_test) & (X_time.year == year_test)
+            ].index.values
             yield (
                 idx_train, idx_test
             )
