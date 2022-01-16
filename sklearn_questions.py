@@ -147,7 +147,8 @@ class MonthlySplit(BaseCrossValidator):
     """
 
     def __init__(self, time_col='index'):  # noqa: D107
-        self.time_col = time_col       
+        self.time_col = time_col
+
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
 
@@ -170,7 +171,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
-        
+
         return index for train and test set
         Parameters
         ----------
