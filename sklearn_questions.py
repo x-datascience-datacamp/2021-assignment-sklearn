@@ -17,7 +17,10 @@ the test we implemented. You can run the tests by calling at the root of the
 repo `pytest test_sklearn_questions.py`. Note that to be fully valid, a
 scikit-learn estimator needs to check that the input given to `fit` and
 `predict` are correct using the `check_*` functions imported in the file.
+You can find more information on how they should be used in the following doc:
+https://scikit-learn.org/stable/developers/develop.html#rolling-your-own-estimator.
 Make sure to use them to pass `test_nearest_neighbor_check_estimator`.
+
 
 Detailed instructions for question 2:
 The data to split should contain the index or one column in
@@ -70,9 +73,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
          Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
-            training data.
+            Data to train the model.
         y : ndarray, shape (n_samples,)
-            target values.
+            Labels associated with the training data.
 
         Returns
         ----------
@@ -87,12 +90,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         Parameters
         ----------
         X : ndarray, shape (n_test_samples, n_features)
-            Test data to predict on.
+            Data to predict on.
 
         Returns
         ----------
         y : ndarray, shape (n_test_samples,)
-            Class labels for each test data sample.
+            Predicted class labels for each test data sample.
         """
         y_pred = np.zeros(X.shape[0])
         return y_pred
@@ -103,7 +106,7 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
-            training data.
+            Data to score on.
         y : ndarray, shape (n_samples,)
             target values.
 
