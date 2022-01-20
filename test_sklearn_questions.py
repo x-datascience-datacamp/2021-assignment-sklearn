@@ -42,8 +42,7 @@ def test_one_nearest_neighbor_check_estimator(k):
 @pytest.mark.parametrize("shuffle_data", [True, False])
 def test_time_split(end_date, expected_splits, shuffle_data):
 
-    date = pd.date_range(start='2020-01-01',
-                         end=end_date, freq='D')
+    date = pd.date_range(start='2020-01-01', end=end_date, freq='D')
     n_samples = len(date)
     X = pd.DataFrame(range(n_samples), index=date, columns=['val'])
     y = pd.DataFrame(
@@ -90,8 +89,7 @@ def test_time_split(end_date, expected_splits, shuffle_data):
 
 @pytest.mark.parametrize("end_date", ['2021-01-31', '2020-12-31'])
 @pytest.mark.parametrize("shuffle_data", [True, False])
-@pytest.mark.parametrize("sample_perc", [0.2, 0.5, 0.8, 1.0])
-def test_time_split_on_column(end_date, shuffle_data, sample_perc):
+def test_time_split_on_column(end_date, shuffle_data):
 
     date = pd.date_range(
         start='2020-01-01 00:00', end=end_date, freq='D'
@@ -105,11 +103,6 @@ def test_time_split_on_column(end_date, shuffle_data, sample_perc):
     if shuffle_data:
         X, y = shuffle(X, y, random_state=0)
 
-    if sample_perc < 1.0:
-        sample_index = np.random.randint(X.shape[0],
-                                         size=int(sample_perc * X.shape[0]))
-        X = X.iloc[sample_index]
-        y = y.iloc[sample_index]
 
     cv = MonthlySplit(time_col='date')
 
