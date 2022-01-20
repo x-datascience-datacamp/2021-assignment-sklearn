@@ -103,7 +103,6 @@ def test_time_split_on_column(end_date, shuffle_data):
     if shuffle_data:
         X, y = shuffle(X, y, random_state=0)
 
-
     cv = MonthlySplit(time_col='date')
 
     # Test that train, test indices returned are integers and
