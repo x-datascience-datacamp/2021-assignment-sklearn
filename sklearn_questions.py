@@ -47,6 +47,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 to compute distances between 2 sets of samples.
 """
+from cProfile import label
 import numpy as np
 import pandas as pd
 
@@ -59,6 +60,10 @@ from sklearn.utils.validation import check_X_y, check_is_fitted
 from sklearn.utils.validation import check_array
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.metrics.pairwise import pairwise_distances
+from collections import Counter
+from dateutil.relativedelta import relativedelta
+from pandas.api.types import is_datetime64_any_dtype as is_datetime
+
 
 
 class KNearestNeighbors(BaseEstimator, ClassifierMixin):
@@ -82,6 +87,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.X_ = X
+        self.labels_ = y
+        self.classes_ = np.unique(y)
+
         return self
 
     def predict(self, X):
@@ -97,7 +108,13 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
+        check_is_fitted(self)
+        X = check_array(X)
+        print(X.shape)
+
         y_pred = np.zeros(X.shape[0])
+        distances = pairwise_distances(self.X_,X)
+        y_pred = self.labels_[np.argmin(distances, axis=0)]
         return y_pred
 
     def score(self, X, y):
@@ -115,7 +132,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        check_classification_targets(y)
+        y_pred = self.predict(X)
+        return np.mean(y_pred==y)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -155,7 +174,8 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        X1 = X if self.time_col == 'index' else X.set_index(self.time_col)
+        return len(X1.resample('M'))-1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -177,12 +197,17 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
+        X1 = X if self.time_col == 'index' else X.set_index(self.time_col)
+        if not is_datetime(X1.index):
+            raise ValueError('datetime')
         n_splits = self.get_n_splits(X, y, groups)
+        indices = [0]
+        for _, g in X1.resample('M'):
+            indices.append(len(g))
+        indices = np.cumsum(indices)
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = range(indices[i], indices[i+1])
+            idx_test = range(indices[i+1], indices[i+2])
             yield (
                 idx_train, idx_test
             )
