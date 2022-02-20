@@ -33,7 +33,7 @@ second split to learn december and predict on january etc.
 
 We also ask you to respect the pep8 convention: https://pep8.org. This will be
 enforced with `flake8`. You can check that there is no flake8 errors by
-calling `flake8` at the root of the repo.
+calling `flake8` at the root of the repo.n k
 
 Finally, you need to write docstrings for the methods you code and for the
 class. The docstring will be checked using `pydocstyle` that you can also
@@ -82,6 +82,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+
+        self.classes_ = np.unique(y)
+        self.X_train_, self.y_train_ = X, y
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X):
@@ -97,7 +103,16 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self, ['X_train_', 'y_train_', 'classes_'])
+        X = check_array(X)
+        y_pred = [None]*X.shape[0]
+        distance_matrix = pairwise_distances(X, self.X_train_)
+        for k in range(distance_matrix.shape[0]):
+            line = distance_matrix[k][:]
+            indices = line.argsort()[:self.n_neighbors]
+            y_n = self.y_train_[indices]
+            y_pred[k] = max(list(y_n), key=list(y_n).count)
+        y_pred = np.array(y_pred)
         return y_pred
 
     def score(self, X, y):
@@ -115,7 +130,9 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_hat = self.predict(X)
+        accuracy = np.mean(y_hat == y)
+        return accuracy
 
 
 class MonthlySplit(BaseCrossValidator):
