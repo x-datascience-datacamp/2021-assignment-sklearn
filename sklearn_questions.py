@@ -82,6 +82,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        check_classification_targets(y)
+        self.classes_ = np.unique(y)
+        self.X_train_ = X
+        self.y_train_ = y
+
         return self
 
     def predict(self, X):
@@ -97,7 +103,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
+        check_is_fitted(self)
+        X = check_array(X)
+        distances = pairwise_distances(self.X_train_, X)
+        ind_predictions = np.argmin(distances, axis=0)
+        y_pred = self.y_train_[ind_predictions]
+
         return y_pred
 
     def score(self, X, y):
@@ -115,7 +126,10 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        diff = np.abs(y - y_pred)
+        scores = len(diff[diff == 0])/len(diff)
+        return scores
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -155,7 +169,20 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col != 'index':
+            X = X.set_index(self.time_col)
+        dates = X.index
+
+        if type(dates) != pd.core.indexes.datetimes.DatetimeIndex:
+            raise ValueError("not a datetime")
+
+        start = min(dates)
+        end = max(dates)
+
+        nb_months = (end.year - start.year) * 12 + (end.month - start.month)
+        n_splits = nb_months
+
+        return n_splits
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -177,12 +204,29 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
-
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+
+        if self.time_col != 'index':
+            X = X.set_index(self.time_col)
+        data3 = (X.index).to_frame()
+        dates = data3[data3.keys()[0]]
+        indexes = (X.reset_index()).index
+
+        start = min(dates)
+        y, m = start.year, start.month
+
+        def next_y_m(y, m):
+            y = y + m // 12
+            m = m % 12 + 1
+            return y, m
+
+        def correct_split(date):
+            return (date.year == y) & (date.month == m)
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+            idx_train = indexes[dates.apply(correct_split)].to_list()
+            y, m = next_y_m(y, m)
+            idx_test = indexes[dates.apply(correct_split)].to_list()
             yield (
                 idx_train, idx_test
             )
