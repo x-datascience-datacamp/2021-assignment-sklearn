@@ -82,6 +82,12 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        check_classification_targets(y)
+        X, y = check_X_y(X, y)
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+        self.training_samples_ = X
+        self.training_target_ = y
         return self
 
     def predict(self, X):
@@ -97,8 +103,14 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        X = check_array(X)
+        check_is_fitted(self, ["training_samples_", "training_samples_"])
+
+        distances = pairwise_distances(X, self.training_samples_)
+        k_closest_ = np.argsort(distances, axis=1)[:, :self.n_neighbors]
+        targets = self.training_target_[k_closest_]
+
+        return self._majority_vote(targets)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -115,7 +127,30 @@ class KNearestNeighbors(BaseEstimator, ClassifierMixin):
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        check_is_fitted(self, ["training_samples_", "training_samples_"])
+        X, y = check_X_y(X, y)
+
+        y_pred = self.predict(X)
+
+        return (y_pred == y).mean()
+
+    def _majority_vote(self, array):
+        """Take majority vote over second axis of this array.
+
+        Parameters
+        -----------
+        array : ndarray, shape (n_samples, k)
+
+        Returns
+        ----------
+        vote : ndarray, shape (n_samples,)
+            Majority vote over the k elements
+        """
+        vote = []
+        for idx, x in enumerate(array):
+            values, counts = np.unique(x, return_counts=True)
+            vote.append(values[np.argmax(counts)])
+        return np.array(vote)
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -155,7 +190,16 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col != 'index':
+            index = X[self.time_col]
+        else:
+            index = X.index
+        if not any([np.dtype(index) == np.dtype('datetime64'),
+                    np.dtype(index) == np.dtype('datetime64[ns]')]):
+            raise ValueError(
+                f'Type of column {self.time_col} should be datetime')
+
+        return len(set([(i.year, i.month) for i in index])) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -177,12 +221,55 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col != 'index':
+            index = X[self.time_col]
+        else:
+            index = X.index
 
-        n_samples = X.shape[0]
         n_splits = self.get_n_splits(X, y, groups)
+        splits = sorted(list(set([(i.year, i.month) for i in index])))
+        # To be used to build a proper temporal cv strategy
+        # first_month = str(splits[0][0]) + '-' + str(splits[0][1])
+        next_data = splits[1:]
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
+
+            year_month_str = str(next_data[i][0]) + '-' + str(next_data[i][1])
+
+            if next_data[i][1] == 12:
+                year_next_month_str = str(next_data[i][0]+1) + '-1'
+            else:
+                year_next_month_str = str(next_data[i][0]) + '-'\
+                    + str(next_data[i][1] + 1)
+
+            if next_data[i][1] == 1:
+                year_last_month_str = str(next_data[i][0]-1) + '-12'
+            else:
+                year_last_month_str = str(next_data[i][0]) + '-'\
+                    + str(next_data[i][1] - 1)
+
+            #################################################################
+            # Actually a better strategy for cv split with temporal data    #
+            # would be to temporally increase the amount of data seen,      #
+            # ie accepting all past months as train data instead of only    #
+            # the last month. This would mimic the way we actually observe  #
+            # the data. This could be done using the following line         #
+            #                                                               #
+            # train_date_range = pd.date_range(start = first_month,         #
+            #                                  end = year_month_str)[:-1]   #
+            #################################################################
+
+            # Take second last value as the last value is the first day of the
+            # end month
+
+            train_date_range = pd.date_range(start=year_last_month_str,
+                                             end=year_month_str)[:-1]
+            test_date_range = pd.date_range(start=year_month_str,
+                                            end=year_next_month_str)[1:-1]
+
+            idx_train = np.where(index.isin(train_date_range) == 1)
+            idx_test = np.where(index.isin(test_date_range) == 1)
+
             yield (
                 idx_train, idx_test
             )
